@@ -18,6 +18,7 @@ The goal is to turn everyday RTSP cameras into an edge analytics platform that c
 - what detections were worth saving and reviewing later?
 
 ![Dashboard overview](docs/assets/dashboard-overview.png)
+TODO: add screenshot with cameras working
 
 ## Current focus
 
@@ -65,7 +66,7 @@ Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO
 ### Current repository structure
 
 ```text
-surveillance-platform/
+home-edge-surveillance-platform/
   app/
     config/        # runtime settings and environment loading
     dashboard/     # Streamlit UI
