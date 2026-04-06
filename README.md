@@ -20,7 +20,7 @@ The goal is to turn everyday RTSP cameras into an edge analytics platform that c
 ## Current status
 
 ![Dashboard overview](docs/assets/dashboard-overview.png)
-TODO: add screenshot with cameras working
+TODO: add screenshot with cameras working, it works I swear...
 
 Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO-based detection, publishes live artifacts, and exposes a dashboard for review.
 
