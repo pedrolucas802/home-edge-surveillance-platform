@@ -17,10 +17,10 @@ The goal is to turn everyday RTSP cameras into an edge analytics platform that c
 - are the cats in the yard, driveway, or front entrance area?
 - what detections were worth saving and reviewing later?
 
+## Current status
+
 ![Dashboard overview](docs/assets/dashboard-overview.png)
 TODO: add screenshot with cameras working
-
-## Current focus
 
 Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO-based detection, publishes live artifacts, and exposes a dashboard for review.
 
