@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.venv/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.streamlit/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.pt
+build/
+data/
+dist/

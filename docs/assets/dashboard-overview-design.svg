@@ -1,0 +1,39 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="700" rx="28" fill="#0F172A"/>
+  <rect x="28" y="28" width="1144" height="644" rx="24" fill="#111827"/>
+  <rect x="56" y="56" width="1088" height="72" rx="18" fill="#1F2937"/>
+  <circle cx="92" cy="92" r="10" fill="#22C55E"/>
+  <text x="118" y="100" fill="#F8FAFC" font-size="30" font-family="Arial, Helvetica, sans-serif" font-weight="700">Home Edge Surveillance Dashboard</text>
+  <text x="58" y="158" fill="#94A3B8" font-size="20" font-family="Arial, Helvetica, sans-serif">Live cameras, detections, and system health in one operator view</text>
+
+  <rect x="56" y="188" width="520" height="316" rx="20" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+  <rect x="624" y="188" width="520" height="316" rx="20" fill="#0B1220" stroke="#334155" stroke-width="2"/>
+  <text x="82" y="226" fill="#E2E8F0" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">cam1 · front yard</text>
+  <text x="650" y="226" fill="#E2E8F0" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">cam2 · driveway</text>
+
+  <rect x="82" y="248" width="468" height="220" rx="16" fill="#172554"/>
+  <rect x="650" y="248" width="468" height="220" rx="16" fill="#1E293B"/>
+  <rect x="180" y="278" width="96" height="150" rx="12" stroke="#FBBF24" stroke-width="4"/>
+  <rect x="320" y="322" width="110" height="74" rx="12" stroke="#38BDF8" stroke-width="4"/>
+  <text x="184" y="272" fill="#F8FAFC" font-size="18" font-family="Arial, Helvetica, sans-serif">person 0.92</text>
+  <text x="320" y="316" fill="#F8FAFC" font-size="18" font-family="Arial, Helvetica, sans-serif">cat 0.87</text>
+  <rect x="742" y="294" width="124" height="110" rx="12" stroke="#F97316" stroke-width="4"/>
+  <text x="742" y="286" fill="#F8FAFC" font-size="18" font-family="Arial, Helvetica, sans-serif">dog 0.81</text>
+
+  <rect x="82" y="528" width="262" height="112" rx="18" fill="#1E293B"/>
+  <rect x="364" y="528" width="262" height="112" rx="18" fill="#1E293B"/>
+  <rect x="646" y="528" width="238" height="112" rx="18" fill="#1E293B"/>
+  <rect x="904" y="528" width="214" height="112" rx="18" fill="#1E293B"/>
+
+  <text x="104" y="566" fill="#94A3B8" font-size="18" font-family="Arial, Helvetica, sans-serif">Active cameras</text>
+  <text x="104" y="612" fill="#F8FAFC" font-size="42" font-family="Arial, Helvetica, sans-serif" font-weight="700">2</text>
+
+  <text x="386" y="566" fill="#94A3B8" font-size="18" font-family="Arial, Helvetica, sans-serif">Detections now</text>
+  <text x="386" y="612" fill="#F8FAFC" font-size="42" font-family="Arial, Helvetica, sans-serif" font-weight="700">3</text>
+
+  <text x="668" y="566" fill="#94A3B8" font-size="18" font-family="Arial, Helvetica, sans-serif">Recent event</text>
+  <text x="668" y="612" fill="#F8FAFC" font-size="26" font-family="Arial, Helvetica, sans-serif" font-weight="700">cat at front yard</text>
+
+  <text x="926" y="566" fill="#94A3B8" font-size="18" font-family="Arial, Helvetica, sans-serif">Detector FPS</text>
+  <text x="926" y="612" fill="#F8FAFC" font-size="42" font-family="Arial, Helvetica, sans-serif" font-weight="700">9.8</text>
+</svg>

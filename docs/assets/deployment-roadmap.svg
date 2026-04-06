@@ -1,0 +1,30 @@
+<svg width="1200" height="340" viewBox="0 0 1200 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="340" rx="28" fill="#FFF7ED"/>
+  <text x="48" y="62" fill="#7C2D12" font-size="32" font-family="Arial, Helvetica, sans-serif" font-weight="700">Deployment roadmap</text>
+  <text x="48" y="94" fill="#9A3412" font-size="18" font-family="Arial, Helvetica, sans-serif">How the local prototype evolves into a real edge surveillance platform</text>
+
+  <rect x="56" y="146" width="236" height="132" rx="20" fill="#FFFFFF" stroke="#FDBA74" stroke-width="2"/>
+  <rect x="338" y="146" width="236" height="132" rx="20" fill="#FFFFFF" stroke="#FDBA74" stroke-width="2"/>
+  <rect x="620" y="146" width="236" height="132" rx="20" fill="#FFFFFF" stroke="#FDBA74" stroke-width="2"/>
+  <rect x="902" y="146" width="236" height="132" rx="20" fill="#FFFFFF" stroke="#FDBA74" stroke-width="2"/>
+
+  <text x="120" y="188" fill="#7C2D12" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Phase 1</text>
+  <text x="102" y="220" fill="#431407" font-size="22" font-family="Arial, Helvetica, sans-serif">MacBook prototype</text>
+  <text x="90" y="248" fill="#9A3412" font-size="18" font-family="Arial, Helvetica, sans-serif">Ingest, detect, preview</text>
+
+  <text x="402" y="188" fill="#7C2D12" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Phase 2</text>
+  <text x="384" y="220" fill="#431407" font-size="22" font-family="Arial, Helvetica, sans-serif">Ubuntu edge node</text>
+  <text x="393" y="248" fill="#9A3412" font-size="18" font-family="Arial, Helvetica, sans-serif">24/7 local runtime</text>
+
+  <text x="684" y="188" fill="#7C2D12" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Phase 3</text>
+  <text x="687" y="220" fill="#431407" font-size="22" font-family="Arial, Helvetica, sans-serif">Tailscale access</text>
+  <text x="676" y="248" fill="#9A3412" font-size="18" font-family="Arial, Helvetica, sans-serif">Private remote access</text>
+
+  <text x="966" y="188" fill="#7C2D12" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Phase 4</text>
+  <text x="969" y="220" fill="#431407" font-size="22" font-family="Arial, Helvetica, sans-serif">Public gateway</text>
+  <text x="954" y="248" fill="#9A3412" font-size="18" font-family="Arial, Helvetica, sans-serif">Auth + HTTPS + VPS</text>
+
+  <path d="M292 212H338" stroke="#FB923C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M574 212H620" stroke="#FB923C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M856 212H902" stroke="#FB923C" stroke-width="4" stroke-linecap="round"/>
+</svg>

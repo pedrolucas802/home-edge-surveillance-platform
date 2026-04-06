@@ -1,0 +1,44 @@
+services:
+  camera-publishers:
+    image: surveillance-platform-local:latest
+    build: .
+    container_name: surveillance-publishers
+    command: ["bash", "scripts/run_dashboard_stack.sh", "--publishers-only"]
+    env_file:
+      - .env
+    environment:
+      FFMPEG_BIN: ffmpeg
+      DASHBOARD_DIR: /app/data/dashboard
+      USE_HWACCEL: "false"
+      YOLO_DEVICE: cpu
+      CAMERA_PUBLISHERS_ENABLED: ${CAMERA_PUBLISHERS_ENABLED:-true}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  dashboard:
+    image: surveillance-platform-local:latest
+    build: .
+    container_name: surveillance-dashboard
+    command:
+      [
+        "streamlit",
+        "run",
+        "app/dashboard/streamlit_app.py",
+        "--server.address",
+        "0.0.0.0",
+        "--server.port",
+        "8501"
+      ]
+    env_file:
+      - .env
+    environment:
+      DASHBOARD_DIR: /app/data/dashboard
+      CAMERA_PUBLISHERS_ENABLED: ${CAMERA_PUBLISHERS_ENABLED:-true}
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8501:8501"
+    depends_on:
+      - camera-publishers
+    restart: unless-stopped

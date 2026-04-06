@@ -1,0 +1,37 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="520" rx="28" fill="#F8FAFC"/>
+  <text x="48" y="62" fill="#0F172A" font-size="32" font-family="Arial, Helvetica, sans-serif" font-weight="700">System architecture</text>
+  <text x="48" y="94" fill="#475569" font-size="18" font-family="Arial, Helvetica, sans-serif">Low-latency ingest, asynchronous inference, and dashboard-friendly artifact publishing</text>
+
+  <rect x="56" y="150" width="190" height="120" rx="18" fill="#E0F2FE" stroke="#38BDF8" stroke-width="2"/>
+  <text x="92" y="197" fill="#0F172A" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">RTSP cameras</text>
+  <text x="87" y="228" fill="#334155" font-size="18" font-family="Arial, Helvetica, sans-serif">main + sub streams</text>
+
+  <rect x="290" y="150" width="190" height="120" rx="18" fill="#DCFCE7" stroke="#22C55E" stroke-width="2"/>
+  <text x="332" y="197" fill="#0F172A" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">FFmpeg ingest</text>
+  <text x="322" y="228" fill="#334155" font-size="18" font-family="Arial, Helvetica, sans-serif">decode + resize</text>
+
+  <rect x="524" y="150" width="190" height="120" rx="18" fill="#FEF3C7" stroke="#F59E0B" stroke-width="2"/>
+  <text x="545" y="197" fill="#0F172A" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Latest-frame buffer</text>
+  <text x="550" y="228" fill="#334155" font-size="18" font-family="Arial, Helvetica, sans-serif">freshest frame only</text>
+
+  <rect x="758" y="150" width="190" height="120" rx="18" fill="#FCE7F3" stroke="#EC4899" stroke-width="2"/>
+  <text x="797" y="197" fill="#0F172A" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">YOLO + tracking</text>
+  <text x="788" y="228" fill="#334155" font-size="18" font-family="Arial, Helvetica, sans-serif">people + pets</text>
+
+  <rect x="992" y="150" width="152" height="120" rx="18" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="2"/>
+  <text x="1014" y="197" fill="#0F172A" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">Artifacts</text>
+  <text x="1023" y="228" fill="#334155" font-size="18" font-family="Arial, Helvetica, sans-serif">JSONL + images</text>
+
+  <path d="M246 210H290" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M480 210H524" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M714 210H758" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+  <path d="M948 210H992" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+
+  <rect x="438" y="342" width="324" height="118" rx="22" fill="#0F172A"/>
+  <text x="505" y="388" fill="#F8FAFC" font-size="28" font-family="Arial, Helvetica, sans-serif" font-weight="700">Streamlit dashboard</text>
+  <text x="483" y="421" fill="#CBD5E1" font-size="18" font-family="Arial, Helvetica, sans-serif">live views, recent events, system health</text>
+
+  <path d="M1068 270V322H600" stroke="#64748B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M600 322V342" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+</svg>

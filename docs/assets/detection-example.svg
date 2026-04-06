@@ -1,0 +1,18 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="520" rx="28" fill="#0F172A"/>
+  <rect x="28" y="28" width="1144" height="464" rx="22" fill="#172554"/>
+  <text x="52" y="68" fill="#F8FAFC" font-size="28" font-family="Arial, Helvetica, sans-serif" font-weight="700">Annotated detection example</text>
+  <text x="52" y="98" fill="#BFDBFE" font-size="18" font-family="Arial, Helvetica, sans-serif">Example placeholder for a live frame with person and pet detections</text>
+
+  <rect x="156" y="120" width="220" height="280" rx="14" stroke="#FBBF24" stroke-width="5"/>
+  <text x="160" y="114" fill="#F8FAFC" font-size="20" font-family="Arial, Helvetica, sans-serif">person #7 · 0.94</text>
+
+  <rect x="546" y="250" width="190" height="122" rx="14" stroke="#38BDF8" stroke-width="5"/>
+  <text x="546" y="242" fill="#F8FAFC" font-size="20" font-family="Arial, Helvetica, sans-serif">cat #3 · 0.89</text>
+
+  <rect x="850" y="170" width="164" height="184" rx="14" stroke="#F97316" stroke-width="5"/>
+  <text x="850" y="162" fill="#F8FAFC" font-size="20" font-family="Arial, Helvetica, sans-serif">dog #2 · 0.83</text>
+
+  <rect x="44" y="432" width="1112" height="40" rx="12" fill="#111827"/>
+  <text x="62" y="458" fill="#E2E8F0" font-size="18" font-family="Arial, Helvetica, sans-serif">FPS 14.8 | Latency 67.2 ms | DetFPS 9.6 | Infer 104.1 ms | Frame 482 | Dets 3</text>
+</svg>
