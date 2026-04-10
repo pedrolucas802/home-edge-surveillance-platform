@@ -166,23 +166,5 @@ python scripts/run_all_cameras.py --enable-yolo --tracking --launch-delay 3.0
 ## Local fine-tuning
 
 The full dataset-prep and fine-tuning workflow lives in [docs/TRAINING_RUNBOOK.md](docs/TRAINING_RUNBOOK.md).
-That runbook covers:
-
-- building `datasets/current_detect_dataset`
-- running quick smoke tests and full training jobs
-- current dataset coverage and limitations
-- promoted artifact paths and the April 9, 2026 baseline results
-- the next data-collection priorities
-
-To test the promoted checkpoint in the live app:
-
-```bash
-.venv/bin/python -m app.main \
-  --camera cam1 \
-  --enable-yolo \
-  --yolo-model models/home-surveillance-yolo26m-best.pt \
-  --yolo-device mps \
-  --yolo-classes person cat dog car car_plate
-```
 
 Operational commands, Docker workflows, troubleshooting steps, and off-LAN notes live in [docs/RUNBOOK.md](docs/RUNBOOK.md).
