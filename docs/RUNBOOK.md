@@ -4,6 +4,8 @@
 
 This runbook is the day-to-day operations guide for the `Home Edge Surveillance Analytics Platform`.
 
+For dataset preparation and model fine-tuning, use [docs/TRAINING_RUNBOOK.md](TRAINING_RUNBOOK.md).
+
 Use it for:
 
 - starting the local surveillance stack
@@ -32,6 +34,8 @@ This runbook reflects the current Phase 1 setup:
 
 - `.env`
 - `README.md`
+- `models/home-surveillance-yolo26m-best.pt`
+- `docs/TRAINING_RUNBOOK.md`
 - `scripts/run_dashboard_stack.sh`
 - `scripts/run_all_cameras.py`
 - `app/main.py`

@@ -1,0 +1,27 @@
+# Copy this file to a local dataset YAML, then update `path` to your dataset root.
+#
+# Expected layout:
+#   <path>/
+#     images/
+#       train/
+#       val/
+#       test/        # optional
+#     labels/
+#       train/
+#       val/
+#       test/        # optional
+#
+# Each label file should use standard YOLO detection format:
+#   <class_id> <x_center> <y_center> <width> <height>
+
+path: /absolute/path/to/home_surveillance_dataset
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: person
+  1: cat
+  2: dog
+  3: car
+  4: car_plate

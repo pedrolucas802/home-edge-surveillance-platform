@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .venv/
+.venv312/
 .coverage
 .mypy_cache/
 .pytest_cache/
@@ -14,4 +15,7 @@ __pycache__/
 *.pt
 build/
 data/
+datasets/
 dist/
+runs/
+!models/*.pt
