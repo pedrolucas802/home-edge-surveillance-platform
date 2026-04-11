@@ -61,7 +61,8 @@ CAM_PASS=your-real-camera-password
 CAM_STREAM=onvif2
 RTSP_TRANSPORT=udp
 YOLO_ENABLED=true
-YOLO_CLASSES=person,cat
+YOLO_MODEL=models/home-surveillance-yolo26m-best.pt
+YOLO_CLASSES=person,cat,dog,car,car_plate
 YOLO_TRACKING=true
 DASHBOARD_ENABLED=true
 DASHBOARD_DIR=data/dashboard
@@ -146,6 +147,7 @@ Current safe setting for this repo while off-LAN:
 - keep `CAMERA_PUBLISHERS_ENABLED=false` in `.env`
 - use Docker for dashboard access only
 - use local `.venv` if you want Apple `mps` acceleration later when back on the camera LAN
+- keep the promoted baseline checkpoint as the default runtime model unless you are intentionally testing a smaller fallback
 
 ## Shutdown
 

@@ -25,7 +25,7 @@ Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO
 
 - decent frame ingestion from H.265 RTSP cameras
 - low-latency latest-frame behavior instead of media-player-style buffering
-- real-time detection for people, cars, car plates, and household animals such as cats
+- real-time detection for people, cars, car plates, and household animals such as cats and dogs
 - optional object tracking for persistent IDs
 - live dashboard views and recent event history
 
@@ -150,6 +150,11 @@ pip install -r requirements.txt
 cp .env.example .env
 python -m app.main --camera cam1
 ```
+
+The checked-in defaults now point to the promoted checkpoint at
+`models/home-surveillance-yolo26m-best.pt`. If you want a smaller or different
+runtime model for a quick experiment, override `YOLO_MODEL` and `YOLO_CLASSES`
+in `.env`.
 
 To run the dashboard stack:
 

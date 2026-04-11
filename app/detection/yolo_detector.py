@@ -30,7 +30,7 @@ class YoloDetector:
 
     def __init__(
         self,
-        model_name: str = "yolo26n.pt",
+        model_name: str = "models/home-surveillance-yolo26m-best.pt",
         device: str = "cpu",
         confidence: float = 0.35,
         iou: float = 0.45,
