@@ -49,6 +49,12 @@ def build_parser(defaults: Settings) -> argparse.ArgumentParser:
     parser.add_argument("--dashboard-dir", default=defaults.dashboard_dir, help="Directory for dashboard live data.")
     parser.add_argument("--disable-hwaccel", action="store_true", help="Disable videotoolbox hardware acceleration.")
     parser.add_argument("--enable-yolo", action="store_true", default=defaults.yolo_enabled, help="Enable YOLO inference in preview.")
+    parser.add_argument(
+        "--pose",
+        action=argparse.BooleanOptionalAction,
+        default=defaults.yolo_pose_enabled,
+        help="Enable YOLO keypoint pose overlay when the selected model supports pose outputs.",
+    )
     parser.add_argument("--yolo-model", default=defaults.yolo_model, help="YOLO model name/path when enabled.")
     parser.add_argument("--yolo-device", default=defaults.yolo_device, help="YOLO device: cpu, mps, cuda, auto.")
     parser.add_argument("--yolo-confidence", type=float, default=defaults.yolo_confidence, help="YOLO confidence threshold.")
@@ -111,6 +117,9 @@ def build_settings(defaults: Settings, args: argparse.Namespace) -> Settings:
         window_name=args.window_name,
         dashboard_enabled=args.dashboard_publish,
         dashboard_dir=args.dashboard_dir,
+        yolo_enabled=args.enable_yolo,
+        yolo_pose_enabled=args.pose,
+        yolo_tracking=args.tracking,
     )
 
 
@@ -153,7 +162,8 @@ def main() -> int:
     reader = FFmpegLatestFrameReader(settings=settings, logger=logger)
     dashboard_store = DashboardStore(settings=settings, logger=logger) if settings.dashboard_enabled else None
     detector = None
-    if args.enable_yolo:
+    run_yolo = bool(args.enable_yolo or args.pose or args.tracking)
+    if run_yolo:
         try:
             detector = YoloDetector(
                 model_name=args.yolo_model,
@@ -162,6 +172,8 @@ def main() -> int:
                 iou=args.yolo_iou,
                 imgsz=args.yolo_imgsz,
                 target_classes=tuple(args.yolo_classes),
+                detect_enabled=args.enable_yolo,
+                pose_enabled=args.pose,
                 tracking=args.tracking,
                 tracker=args.tracker,
                 track_history_length=args.track_history,
@@ -170,12 +182,17 @@ def main() -> int:
             logger.error("%s", exc)
             return 2
         logger.info(
-            "YOLO enabled with model=%s device=%s imgsz=%s classes=%s infer_every_n=%s tracking=%s tracker=%s",
+            (
+                "YOLO enabled with model=%s device=%s imgsz=%s classes=%s infer_every_n=%s "
+                "detect=%s pose=%s tracking=%s tracker=%s"
+            ),
             args.yolo_model,
             detector.device or "cpu-auto",
             args.yolo_imgsz,
             ",".join(args.yolo_classes) if args.yolo_classes else "all",
             args.infer_every_n,
+            "on" if args.enable_yolo else "off",
+            "on" if args.pose else "off",
             "on" if args.tracking else "off",
             args.tracker,
         )

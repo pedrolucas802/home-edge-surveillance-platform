@@ -156,7 +156,13 @@ The checked-in defaults now point to the promoted checkpoint at
 runtime model for a quick experiment, override `YOLO_MODEL` and `YOLO_CLASSES`
 in `.env`.
 
-To run the dashboard stack:
+To run the full stack with recommended local defaults (`YOLO_DEVICE=mps`, RTSP transport from `.env`):
+
+```bash
+bash scripts/start_everything.sh
+```
+
+To run the dashboard stack directly:
 
 ```bash
 bash scripts/run_dashboard_stack.sh

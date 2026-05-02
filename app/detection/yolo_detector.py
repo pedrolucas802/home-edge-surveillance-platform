@@ -15,6 +15,7 @@ class Detection:
     confidence: float
     bbox_xyxy: tuple[int, int, int, int]
     track_id: int | None = None
+    keypoints: tuple[tuple[int, int, float], ...] | None = None
 
 
 class BaseDetector(Protocol):
@@ -28,6 +29,25 @@ class BaseDetector(Protocol):
 class YoloDetector:
     """Ultralytics YOLO adapter. Keep it isolated from stream ingestion details."""
 
+    _COCO_SKELETON_EDGES: tuple[tuple[int, int], ...] = (
+        (0, 1),
+        (0, 2),
+        (1, 3),
+        (2, 4),
+        (5, 6),
+        (5, 7),
+        (7, 9),
+        (6, 8),
+        (8, 10),
+        (5, 11),
+        (6, 12),
+        (11, 12),
+        (11, 13),
+        (13, 15),
+        (12, 14),
+        (14, 16),
+    )
+
     def __init__(
         self,
         model_name: str = "models/home-surveillance-yolo26m-best.pt",
@@ -36,6 +56,8 @@ class YoloDetector:
         iou: float = 0.45,
         imgsz: int = 960,
         target_classes: tuple[str, ...] = (),
+        detect_enabled: bool = True,
+        pose_enabled: bool = False,
         tracking: bool = False,
         tracker: str = "bytetrack.yaml",
         track_history_length: int = 30,
@@ -53,6 +75,8 @@ class YoloDetector:
         self.names = self._normalize_names(self.model.names)
         self.use_class_filter = bool(target_classes)
         self.target_class_ids = self._resolve_target_class_ids(target_classes)
+        self.detect_enabled = detect_enabled
+        self.pose_enabled = pose_enabled
         self.tracking = tracking
         self.tracker = tracker
         self.track_history_length = track_history_length
@@ -95,6 +119,7 @@ class YoloDetector:
             confidence = float(box.conf.item())
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             track_id = track_ids[idx] if idx < len(track_ids) else None
+            keypoints = self._extract_pose_keypoints(result, idx) if self.pose_enabled else None
             if track_id is not None:
                 center_x = int((x1 + x2) / 2)
                 center_y = int((y1 + y2) / 2)
@@ -106,6 +131,7 @@ class YoloDetector:
                     confidence=confidence,
                     bbox_xyxy=(x1, y1, x2, y2),
                     track_id=track_id,
+                    keypoints=keypoints,
                 )
             )
         return detections
@@ -113,21 +139,24 @@ class YoloDetector:
     def draw(self, frame: np.ndarray, detections: list[Detection]) -> None:
         for detection in detections:
             x1, y1, x2, y2 = detection.bbox_xyxy
-            label = f"{detection.class_name} {detection.confidence:.2f}"
-            if detection.track_id is not None:
-                label = f"{detection.class_name} #{detection.track_id} {detection.confidence:.2f}"
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 255), 2)
-            cv2.putText(
-                frame,
-                label,
-                (x1, max(y1 - 8, 20)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                (0, 200, 255),
-                2,
-                cv2.LINE_AA,
-            )
-            if detection.track_id is None:
+            if self.detect_enabled:
+                label = f"{detection.class_name} {detection.confidence:.2f}"
+                if detection.track_id is not None:
+                    label = f"{detection.class_name} #{detection.track_id} {detection.confidence:.2f}"
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 255), 2)
+                cv2.putText(
+                    frame,
+                    label,
+                    (x1, max(y1 - 8, 20)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (0, 200, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+            if self.pose_enabled and detection.keypoints:
+                self._draw_pose(frame, detection.keypoints)
+            if not self.detect_enabled or detection.track_id is None:
                 continue
 
             points = list(self.track_history.get(detection.track_id, ()))
@@ -143,6 +172,62 @@ class YoloDetector:
                 thickness=2,
                 lineType=cv2.LINE_AA,
             )
+
+    def _draw_pose(self, frame: np.ndarray, keypoints: tuple[tuple[int, int, float], ...]) -> None:
+        for x, y, confidence in keypoints:
+            if confidence < 0.15:
+                continue
+            cv2.circle(frame, (x, y), 3, (80, 255, 120), -1, lineType=cv2.LINE_AA)
+
+        if len(keypoints) < 17:
+            return
+
+        for start_idx, end_idx in self._COCO_SKELETON_EDGES:
+            if start_idx >= len(keypoints) or end_idx >= len(keypoints):
+                continue
+            x1, y1, c1 = keypoints[start_idx]
+            x2, y2, c2 = keypoints[end_idx]
+            if c1 < 0.15 or c2 < 0.15:
+                continue
+            cv2.line(
+                frame,
+                (x1, y1),
+                (x2, y2),
+                (80, 255, 120),
+                2,
+                lineType=cv2.LINE_AA,
+            )
+
+    @staticmethod
+    def _extract_pose_keypoints(
+        result: object,
+        index: int,
+    ) -> tuple[tuple[int, int, float], ...] | None:
+        keypoints = getattr(result, "keypoints", None)
+        if keypoints is None:
+            return None
+
+        keypoint_data = getattr(keypoints, "data", None)
+        if keypoint_data is None:
+            return None
+
+        try:
+            data_cpu = keypoint_data[index].cpu().numpy()
+        except Exception:
+            return None
+        if data_cpu.size == 0:
+            return None
+
+        parsed_points: list[tuple[int, int, float]] = []
+        for raw_point in data_cpu:
+            if len(raw_point) < 2:
+                continue
+            x_coord = int(raw_point[0])
+            y_coord = int(raw_point[1])
+            confidence = float(raw_point[2]) if len(raw_point) >= 3 else 1.0
+            parsed_points.append((x_coord, y_coord, confidence))
+
+        return tuple(parsed_points) if parsed_points else None
 
     @staticmethod
     def _normalize_names(names: dict[int, str] | Iterable[str]) -> dict[int, str]:

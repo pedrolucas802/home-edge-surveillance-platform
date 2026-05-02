@@ -27,6 +27,8 @@ def resolve_dashboard_dir(raw_path: str) -> Path:
 class DashboardStore:
     """Persist live camera artifacts for the Streamlit dashboard."""
 
+    _TRACK_EVENT_DEDUP_CLASSES: frozenset[str] = frozenset({"person", "cat", "car"})
+
     def __init__(self, settings: Settings, logger: logging.Logger) -> None:
         self.settings = settings
         self.logger = logger.getChild("dashboard_store")
@@ -41,6 +43,7 @@ class DashboardStore:
         self._last_publish_at = 0.0
         self._last_event_at = 0.0
         self._last_event_signature: tuple[tuple[str, int | None], ...] | None = None
+        self._seen_tracked_event_ids: set[tuple[str, int]] = set()
 
     def publish(
         self,
@@ -92,6 +95,11 @@ class DashboardStore:
     ) -> dict[str, object]:
         labels = [detection.class_name for detection in detections]
         counts = dict(sorted(Counter(labels).items()))
+        runtime_yolo_enabled = (
+            self.settings.yolo_enabled
+            or self.settings.yolo_pose_enabled
+            or self.settings.yolo_tracking
+        )
         return {
             "camera_id": self.settings.camera_id,
             "camera_host": self.settings.camera_host,
@@ -109,6 +117,13 @@ class DashboardStore:
             "detections_count": len(detections),
             "counts": counts,
             "detections": [self._serialize_detection(detection) for detection in detections],
+            "yolo_enabled": self.settings.yolo_enabled,
+            "yolo_detect_enabled": self.settings.yolo_enabled,
+            "yolo_pose_enabled": self.settings.yolo_pose_enabled,
+            "yolo_model": self.settings.yolo_model if runtime_yolo_enabled else None,
+            "yolo_device": self.settings.yolo_device,
+            "yolo_classes": list(self.settings.yolo_classes),
+            "yolo_confidence": self.settings.yolo_confidence,
             "tracking_enabled": self.settings.yolo_tracking,
         }
 
@@ -141,6 +156,21 @@ class DashboardStore:
         now_monotonic: float,
         detections: list[Detection],
     ) -> bool:
+        if self.settings.yolo_tracking:
+            tracked_signatures = self._build_tracked_event_signatures(detections)
+            if tracked_signatures:
+                unseen_tracks = tracked_signatures - self._seen_tracked_event_ids
+                if unseen_tracks:
+                    self._seen_tracked_event_ids.update(unseen_tracks)
+                    return True
+
+                has_non_tracked_detection = any(
+                    not self._is_track_dedup_candidate(detection)
+                    for detection in detections
+                )
+                if not has_non_tracked_detection:
+                    return False
+
         signature = self._build_event_signature(detections)
         if self._last_event_signature != signature:
             return True
@@ -148,6 +178,26 @@ class DashboardStore:
             now_monotonic - self._last_event_at
             >= self.settings.dashboard_event_cooldown_seconds
         )
+
+    @classmethod
+    def _is_track_dedup_candidate(cls, detection: Detection) -> bool:
+        if detection.track_id is None:
+            return False
+        return detection.class_name.lower() in cls._TRACK_EVENT_DEDUP_CLASSES
+
+    @classmethod
+    def _build_tracked_event_signatures(
+        cls,
+        detections: list[Detection],
+    ) -> set[tuple[str, int]]:
+        signatures: set[tuple[str, int]] = set()
+        for detection in detections:
+            if not cls._is_track_dedup_candidate(detection):
+                continue
+            if detection.track_id is None:
+                continue
+            signatures.add((detection.class_name.lower(), detection.track_id))
+        return signatures
 
     @staticmethod
     def _build_event_signature(

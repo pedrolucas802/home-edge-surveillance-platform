@@ -37,6 +37,7 @@ This runbook reflects the current Phase 1 setup:
 - `models/home-surveillance-yolo26m-best.pt`
 - `docs/TRAINING_RUNBOOK.md`
 - `scripts/run_dashboard_stack.sh`
+- `scripts/start_everything.sh`
 - `scripts/run_all_cameras.py`
 - `app/main.py`
 - `app/dashboard/streamlit_app.py`
@@ -81,7 +82,7 @@ source .venv/bin/activate
 ### 2. Start full local stack
 
 ```bash
-bash scripts/run_dashboard_stack.sh
+bash scripts/start_everything.sh
 ```
 
 This does:
@@ -89,6 +90,7 @@ This does:
 - starts one headless publisher per configured camera
 - writes live frames and event artifacts into `data/dashboard`
 - launches the Streamlit dashboard
+- uses RTSP transport from `.env` and defaults to `YOLO_DEVICE=mps` unless you override it
 
 ### 3. Open dashboard
 

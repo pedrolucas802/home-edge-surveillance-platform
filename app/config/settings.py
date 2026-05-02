@@ -87,6 +87,10 @@ def _get_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     if raw in (None, ""):
         return default
 
+    normalized = raw.strip().lower()
+    if normalized in {"all", "*"}:
+        return ()
+
     values = tuple(part.strip() for part in raw.split(",") if part.strip())
     return values or default
 
@@ -138,6 +142,7 @@ class Settings:
     dashboard_publish_interval_seconds: float
     dashboard_event_cooldown_seconds: float
     yolo_enabled: bool
+    yolo_pose_enabled: bool
     yolo_model: str
     yolo_device: str
     yolo_confidence: float
@@ -253,6 +258,7 @@ class Settings:
             dashboard_publish_interval_seconds=_get_float("DASHBOARD_PUBLISH_INTERVAL_SECONDS", 1.0),
             dashboard_event_cooldown_seconds=_get_float("DASHBOARD_EVENT_COOLDOWN_SECONDS", 3.0),
             yolo_enabled=_get_bool("YOLO_ENABLED", False),
+            yolo_pose_enabled=_get_bool("YOLO_POSE_ENABLED", False),
             yolo_model=os.getenv("YOLO_MODEL", "models/home-surveillance-yolo26m-best.pt"),
             yolo_device=os.getenv("YOLO_DEVICE", "mps"),
             yolo_confidence=_get_float("YOLO_CONFIDENCE", 0.35),

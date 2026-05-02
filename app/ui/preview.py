@@ -85,6 +85,7 @@ def run_preview(
             display_frame = packet.frame.copy()
             detections_count = 0
             latest_detections: list[Detection] = []
+            detections_for_events: list[Detection] = []
             detector_inference_fps = 0.0
             detector_inference_ms = 0.0
             if detector_runner is not None:
@@ -93,7 +94,10 @@ def run_preview(
                 latest_detection = detector_runner.get_latest()
                 if latest_detection is not None:
                     latest_detections = latest_detection.detections
-                    detections_count = len(latest_detections)
+                    detections_for_events = (
+                        latest_detections if settings.yolo_enabled else []
+                    )
+                    detections_count = len(detections_for_events)
                     detector.draw(display_frame, latest_detections)
                 detector_stats = detector_runner.get_stats()
                 detector_inference_fps = detector_stats.inference_fps
@@ -116,7 +120,7 @@ def run_preview(
                     packet=packet,
                     frame=display_frame,
                     fps=fps_ema,
-                    detections=latest_detections,
+                    detections=detections_for_events,
                     detector_stats=detector_stats,
                 )
 
