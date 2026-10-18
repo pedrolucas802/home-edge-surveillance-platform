@@ -13,8 +13,9 @@
 The goal is to turn everyday RTSP cameras into an edge analytics platform that can answer practical questions such as:
 
 - is a person near the house right now?
+- did a tripwire or motion radar confirm what the camera saw?
 - which camera saw activity first?
-- are the cats in the yard, driveway, or front entrance area?
+- was someone at the front wall, the gate, or inside the house?
 - what detections were worth saving and reviewing later?
 
 ## Current status
@@ -25,7 +26,7 @@ Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO
 
 - decent frame ingestion from H.265 RTSP cameras
 - low-latency latest-frame behavior instead of media-player-style buffering
-- real-time detection for people, cars, car plates, and household animals such as cats and dogs
+- real-time person detection
 - optional object tracking for persistent IDs
 - live dashboard views and recent event history
 
@@ -36,27 +37,15 @@ Phase 1 foundation: a clean local prototype that ingests RTSP streams, runs YOLO
 - edge deployment
 - secure remote access.
 
-### Current model baseline
+### Detection model
 
-The current promoted detector checkpoint is `models/home-surveillance-yolo26m-best.pt`.
-It was fine-tuned on the merged `cat`, `dog`, `car`, and `car_plate` dataset at `imgsz=960`,
-stopped by early stopping at epoch `117`, and achieved its best validation result at epoch `87`.
+v2 focuses on people around the house. The default detector is the pretrained
+`yolo26n.pt` (COCO, downloaded by Ultralytics on first run) filtered to the
+`person` class, at `imgsz=640`: small enough for a Raspberry Pi 5 hub.
 
-![YOLO26m 960 training curves](docs/assets/yolo26m-960-training-results.png)
-
-Best validation snapshot from April 9, 2026:
-
-- `Precision`: `0.883`
-- `Recall`: `0.882`
-- `mAP50`: `0.914`
-- `mAP50-95`: `0.608`
-
-Per-class `mAP50-95` for the promoted checkpoint:
-
-- `cat`: `0.576`
-- `dog`: `0.630`
-- `car`: `0.700`
-- `car_plate`: `0.524`
+The earlier fine-tuned pets and cars checkpoint (`cat`, `dog`, `car`,
+`car_plate`), its dataset scripts and training runbook live on the
+`backup/v1-pets-cars` branch.
 
 
 ## Architecture
@@ -70,7 +59,7 @@ Per-class `mAP50-95` for the promoted checkpoint:
                                                                v
 +-------------------+     +--------------------+     +----------------------+
 | Streamlit UI      | <-- |  Event Artifacts   | <-- |  YOLO + Tracking       |
-| live + history    |     | images + JSONL     |     | detect people/cars/pets |
+| live + history    |     | images + JSONL     |     | detect people          |
 +-------------------+     +--------------------+     +----------------------+
 ```
 
@@ -80,7 +69,7 @@ Per-class `mAP50-95` for the promoted checkpoint:
 - [FFmpeg](https://github.com/FFmpeg/FFmpeg) for RTSP ingest, H.265 decode, and frame resizing.
 - [OpenCV](https://github.com/opencv/opencv) for preview rendering, overlays, and image encoding.
 - [PyTorch](https://github.com/pytorch/pytorch) for model inference, using `mps` locally and CPU in Docker.
-- [Ultralytics YOLO26](https://github.com/ultralytics/ultralytics) for person, car, car plate, and pet detection with optional tracking.
+- [Ultralytics YOLO26](https://github.com/ultralytics/ultralytics) for person detection with optional tracking.
 - [Streamlit](https://github.com/streamlit/streamlit) for the live dashboard and system view.
 - [Docker Compose](https://github.com/docker/compose) for packaging the local dashboard and headless workers.
 
@@ -95,10 +84,12 @@ home-edge-surveillance-platform/
     storage/       # published live artifacts and event records
     stream/        # RTSP / FFmpeg frame ingestion
     ui/            # OpenCV preview layer
+    devices/       # device registry and device types
+    sensors/       # MQTT sensor bridge, simulator and demo
     main.py        # main application entrypoint
-  configs/         # tracked config templates, including dataset YAML examples
+  configs/         # tracked config templates, including the devices file example
   docs/            # runbooks, architecture notes, and README assets
-  models/          # promoted checkpoints committed to the repo
+  deploy/          # Mosquitto broker config
   scripts/         # camera launchers and helper scripts
   Dockerfile
   docker-compose.yml
@@ -116,7 +107,7 @@ The ingestion path is built around FFmpeg subprocess piping rather than relying 
 
 #### 3. Detection layer
 
-Ultralytics YOLO26 is used for object detection, with support for `person`, `car`, `car_plate`, and pet-relevant classes such as `cat`. Detection runs asynchronously so the preview and dashboard loop stay responsive even when inference is slower than the camera feed.
+Ultralytics YOLO26 is used for object detection, filtered to `person` by default. Detection runs asynchronously so the preview and dashboard loop stay responsive even when inference is slower than the camera feed.
 
 Tracking is optional and currently uses Ultralytics-compatible trackers to assign persistent IDs across frames.
 
@@ -151,10 +142,8 @@ cp .env.example .env
 python -m app.main --camera cam1
 ```
 
-The checked-in defaults now point to the promoted checkpoint at
-`models/home-surveillance-yolo26m-best.pt`. If you want a smaller or different
-runtime model for a quick experiment, override `YOLO_MODEL` and `YOLO_CLASSES`
-in `.env`.
+The defaults use the pretrained `yolo26n.pt` filtered to `person`. To try a
+bigger model, override `YOLO_MODEL` and `YOLO_IMGSZ` in `.env`.
 
 To run the full stack with recommended local defaults (`YOLO_DEVICE=mps`, RTSP transport from `.env`):
 
@@ -191,9 +180,5 @@ python -m app.sensors.simulator
 
 See [docs/DEVICES.md](docs/DEVICES.md) for the MQTT contract and how to add a
 new device type.
-
-## Local fine-tuning
-
-The full dataset-prep and fine-tuning workflow lives in [docs/TRAINING_RUNBOOK.md](docs/TRAINING_RUNBOOK.md).
 
 Operational commands, Docker workflows, troubleshooting steps, and off-LAN notes live in [docs/RUNBOOK.md](docs/RUNBOOK.md).

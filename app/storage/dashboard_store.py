@@ -28,7 +28,7 @@ def resolve_dashboard_dir(raw_path: str) -> Path:
 class DashboardStore:
     """Persist live camera artifacts for the Streamlit dashboard."""
 
-    _TRACK_EVENT_DEDUP_CLASSES: frozenset[str] = frozenset({"person", "cat", "car"})
+    _TRACK_EVENT_DEDUP_CLASSES: frozenset[str] = frozenset({"person"})
 
     def __init__(self, settings: Settings, logger: logging.Logger) -> None:
         self.settings = settings

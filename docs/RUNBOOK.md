@@ -4,8 +4,6 @@
 
 This runbook is the day-to-day operations guide for the `Home Edge Surveillance Analytics Platform`.
 
-For dataset preparation and model fine-tuning, use [docs/TRAINING_RUNBOOK.md](TRAINING_RUNBOOK.md).
-
 Use it for:
 
 - starting the local surveillance stack
@@ -34,8 +32,8 @@ This runbook reflects the current Phase 1 setup:
 
 - `.env`
 - `README.md`
-- `models/home-surveillance-yolo26m-best.pt`
-- `docs/TRAINING_RUNBOOK.md`
+- `configs/devices.yaml`
+- `docs/DEVICES.md`
 - `scripts/run_dashboard_stack.sh`
 - `scripts/start_everything.sh`
 - `scripts/run_all_cameras.py`
@@ -62,8 +60,8 @@ CAM_PASS=your-real-camera-password
 CAM_STREAM=onvif2
 RTSP_TRANSPORT=udp
 YOLO_ENABLED=true
-YOLO_MODEL=models/home-surveillance-yolo26m-best.pt
-YOLO_CLASSES=person,cat,dog,car,car_plate
+YOLO_MODEL=yolo26n.pt
+YOLO_CLASSES=person
 YOLO_TRACKING=true
 DASHBOARD_ENABLED=true
 DASHBOARD_DIR=data/dashboard
@@ -343,7 +341,7 @@ Then retry:
 Likely causes:
 
 - `onvif2` is low resolution
-- cat is too small in frame
+- the person is too small or far away in frame
 - low light or IR mode
 
 What to try:

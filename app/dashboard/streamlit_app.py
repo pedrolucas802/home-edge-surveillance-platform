@@ -191,7 +191,7 @@ def _render_runtime_controls(
     custom_model = st.text_input(
         "Custom model path (optional)",
         value="",
-        placeholder="models/home-surveillance-yolo26m-best.pt",
+        placeholder="yolo26n.pt",
     ).strip()
     effective_model = custom_model or selected_model
     default_device = str(
@@ -253,13 +253,13 @@ def _render_runtime_controls(
         else (
             ",".join(settings.yolo_classes)
             if settings.yolo_classes
-            else "car,person,cat"
+            else "person"
         )
     )
     yolo_classes = st.text_input(
         "YOLO classes",
         value=default_classes,
-        help="Use all for no class filter, or comma-separated names like car,person,cat.",
+        help="Use all for no class filter, or comma-separated names like person,backpack.",
     ).strip() or "all"
     yolo_confidence = st.slider(
         "YOLO confidence",
