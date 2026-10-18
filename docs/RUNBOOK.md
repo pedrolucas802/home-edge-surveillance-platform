@@ -442,7 +442,7 @@ For normal local use:
 ## Known Limitations
 
 - multi-camera startup can still be flaky on this WiFi/H.265 camera family
-- event storage is file-based, not yet a real database
+- events live in a local SQLite file (`events.db`), not a networked database
 - dashboard is reading published artifacts, not a proper API backend
 - Docker path is operationally useful, but local Apple Silicon runtime is still better for inference performance
 

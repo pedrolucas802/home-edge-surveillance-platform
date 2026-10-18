@@ -58,8 +58,8 @@ The earlier fine-tuned pets and cars checkpoint (`cat`, `dog`, `car`,
                                                                |
                                                                v
 +-------------------+     +--------------------+     +----------------------+
-| Streamlit UI      | <-- |  Event Artifacts   | <-- |  YOLO + Tracking       |
-| live + history    |     | images + JSONL     |     | detect people          |
+| Streamlit UI      | <-- |  Event Store       | <-- |  YOLO + Tracking       |
+| live + history    |     | SQLite + snapshots |     | detect people          |
 +-------------------+     +--------------------+     +----------------------+
 ```
 
@@ -79,7 +79,8 @@ The earlier fine-tuned pets and cars checkpoint (`cat`, `dog`, `car`,
 home-edge-surveillance-platform/
   app/
     config/        # runtime settings and environment loading
-    dashboard/     # Streamlit UI
+    dashboard/     # Streamlit UI: one module per page in views/
+    demo/          # mock cameras, radars and tripwires for the demo
     detection/     # YOLO inference and async detection loop
     storage/       # published live artifacts and event records
     stream/        # RTSP / FFmpeg frame ingestion
@@ -118,17 +119,21 @@ The current build publishes:
 
 - live annotated frames
 - per-camera status metadata
-- JSONL event logs
+- events from every device in SQLite (`events.db`, 30-day retention), with JSONL backups
 - snapshots for notable detections
 
 #### 5. Dashboard layer
 
-The Streamlit dashboard is the operator view of the system. It reads published artifacts and shows:
+The Streamlit dashboard is the operator view of the system. The sidebar is
+navigation only; each area has its own page:
 
-- live camera snapshots
-- recent detections and snapshots
-- per-camera health and freshness
-- simple review-friendly summaries
+- **Home**: site status at a glance, links to every page, latest alerts
+- **Cameras**: live views, detection events with snapshots, camera health
+- **Radars**: live top-down maps of each RD-03D's tracked people
+- **Tripwires**: beam state, receiver level and every crossing
+- **All devices**: every device with IP, MAC, Wi-Fi signal, firmware, last seen
+- **Configuration**: devices, camera IPs, detection model on/off and switch,
+  alerts, Wi-Fi for the boards, sensor alignment, user profile
 
 ## Local development
 
