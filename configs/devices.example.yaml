@@ -27,19 +27,19 @@ devices:
     zone: driveway
     host: 192.168.0.89
 
-  # mmWave motion radars (ESP32 + HLK-LD2410C / LD2450).
+  # mmWave motion radars (ESP32 + Ai-Thinker RD-03D, 24 GHz, tracks up to 3 people).
   - id: radar-living-room
     type: radar
     name: Living room radar
     location: living-room
     zone: indoor
-    model: LD2410C
+    model: RD-03D
   - id: radar-garage
     type: radar
     name: Garage radar
     location: garage
     zone: driveway
-    model: LD2450
+    model: RD-03D
 
   # Tripwires (laser indoors, active IR barrier outdoors).
   - id: tripwire-front-wall

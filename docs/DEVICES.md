@@ -7,7 +7,7 @@ once in the site's devices file, and the hub works out what to do from its
 | Type | Talks to the hub over | Events |
 | --- | --- | --- |
 | `camera` | RTSP (FFmpeg + YOLO publishers) | `detection` |
-| `radar` | MQTT (ESP32 + HLK-LD2410C / LD2450) | `presence_start`, `presence_end`, `targets`, `fault` |
+| `radar` | MQTT (ESP32 + Ai-Thinker RD-03D 24 GHz) | `presence_start`, `presence_end`, `fault` |
 | `tripwire` | MQTT (ESP32 + laser or IR barrier) | `beam_broken`, `beam_restored`, `fault`, `tamper` |
 
 ```text
@@ -33,6 +33,17 @@ camera-only from `CAMERA_HOSTS`, exactly as before.
 and the front-yard camera). Nothing uses it yet; the fusion service will.
 
 ## 2. Run it without hardware
+
+Quickest: `bash scripts/run_demo.sh`. It uses `configs/devices.demo.yaml`
+(3 cameras, 4 RD-03D radars, 4 tripwires in 4 zones) and its own data
+folder `data/demo/`, and starts mock devices plus the dashboard on
+http://localhost:8501. People walk through zones; each one breaks that
+zone's tripwire, shows up as a target on its radar, and appears as a tracked
+`person` on its camera, with snapshots and events saved as a real camera
+publisher would. `bash scripts/run_demo.sh --mqtt` sends the sensor traffic
+through Mosquitto and the bridge instead (start Mosquitto first).
+
+To simulate only the sensors of your own devices file:
 
 You need an MQTT broker. Either:
 
@@ -72,6 +83,23 @@ the devices file and `<device-id>` is the device's `id`.
 | `status` | device to hub | yes | `online` / `offline`; set `offline` as the MQTT Last Will |
 | `telemetry` | device to hub | no | `{"rssi": -60, "uptime_ms": 123456, "fw": "1.0.0"}` every 30 to 60 s |
 | `cmd` | hub to device | no | reserved for siren and arm/disarm commands |
+
+Radars (RD-03D) also publish `state` about twice a second while someone is
+in range, with the decoded targets (the module tracks up to 3 people, 8 m,
+120 degree field of view; frame format in `app/sensors/rd03d.py`):
+
+```json
+{"presence": true, "target_count": 2, "nearest_m": 1.88,
+ "targets": [{"x_mm": -782, "y_mm": 1713, "speed_cms": -16, "distance_mm": 1883, "angle_deg": -24.5}, ...]}
+```
+
+Positions are not stored as events, only as the radar's last state; the
+dashboard draws them on a small top-down map. Events are only
+`presence_start` (with the first targets) and `presence_end`.
+
+Tripwires send `beam_broken` (with `signal`, the receiver level 0..1023) and
+`beam_restored` (with `duration_ms`); a beam blocked for over 30 s reports
+`fault`.
 
 Event payloads need `event`. `ts` is optional (epoch seconds or ms, or ISO
 8601); if it is missing or more than 5 minutes off the hub's clock, the hub's

@@ -52,6 +52,11 @@ def test_invalid_devices_are_rejected(devices):
 
 def test_disabled_devices_are_skipped():
     registry = parse_registry(
-        {"devices": [{"id": "r1", "type": "radar", "enabled": False}, {"id": "r2", "type": "radar"}]}
+        {
+            "devices": [
+                {"id": "r1", "type": "radar", "enabled": False},
+                {"id": "r2", "type": "radar"},
+            ]
+        }
     )
     assert [device.id for device in registry.of_type(RADAR)] == ["r2"]

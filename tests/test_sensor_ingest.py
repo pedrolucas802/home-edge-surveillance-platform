@@ -62,10 +62,10 @@ def test_tripwire_event_is_stored_with_state(ingest, tmp_path):
 
 def test_radar_presence_and_status(ingest):
     ingest.handle_message(
-        "hes/home/radar-1/event", '{"event": "presence_start", "distance_cm": 210, "energy": 80}'
+        "hes/home/radar-1/event", '{"event": "presence_start", "target_count": 2, "nearest_m": 1.9}'
     )
     state = ingest.event_db.device_states()["radar-1"]["state"]
-    assert state == {"presence": True, "distance_cm": 210, "energy": 80}
+    assert state == {"presence": True, "target_count": 2, "nearest_m": 1.9}
 
     ingest.handle_message("hes/home/radar-1/status", "offline")
     assert ingest.event_db.device_states()["radar-1"]["status"] == "offline"

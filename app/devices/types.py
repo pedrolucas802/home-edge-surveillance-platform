@@ -82,19 +82,21 @@ register_device_type(
         plural="Motion radars",
         transport="mqtt",
         icon="📡",
+        # Modelled on the Ai-Thinker RD-03D: up to 3 tracked people, each
+        # with x/y position and speed (see app/sensors/rd03d.py).
         events={
             "presence_start": "A person entered the radar's range",
             "presence_end": "The radar's range is empty again",
-            "targets": "Target count and positions (LD2450)",
+            "targets": "Positions of up to 3 tracked people",
             "fault": "The radar stopped reporting valid frames",
         },
         trigger_events=frozenset({"presence_start"}),
         event_state={
             "presence_start": {"presence": True},
-            "presence_end": {"presence": False},
+            "presence_end": {"presence": False, "target_count": 0, "nearest_m": None, "targets": []},
             "fault": {"fault": True},
         },
-        state_fields=("presence", "distance_cm", "energy", "target_count", "fault"),
+        state_fields=("presence", "target_count", "nearest_m", "fault", "targets"),
     )
 )
 
@@ -118,6 +120,6 @@ register_device_type(
             "fault": {"beam": "fault"},
             "tamper": {"tamper": True},
         },
-        state_fields=("beam", "duration_ms", "tamper"),
+        state_fields=("beam", "duration_ms", "signal", "tamper"),
     )
 )

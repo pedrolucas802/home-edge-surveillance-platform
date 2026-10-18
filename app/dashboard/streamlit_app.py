@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import json
+import math
 import os
 import signal
 import subprocess
@@ -20,7 +21,7 @@ if __package__ in (None, ""):
 
 from app.config.settings import Settings
 from app.devices.registry import DeviceRegistry, DeviceSpec
-from app.devices.types import CAMERA, get_device_type
+from app.devices.types import CAMERA, RADAR, get_device_type
 from app.storage.dashboard_store import resolve_dashboard_dir
 from app.storage.event_store import EventDatabase
 
@@ -928,8 +929,10 @@ def _render_sensor_card(
     rows = [
         f"<div class='sensor-row'><span>{_humanize(key)}</span><strong>{_format_state_value(state[key])}</strong></div>"
         for key in device.device_type.state_fields
-        if key in state
+        if key in state and state[key] is not None and not isinstance(state[key], (list, dict))
     ]
+    if device.type == RADAR:
+        rows.insert(0, _radar_map_svg(state.get("targets") if state.get("presence") else []))
     last_event = state_record.get("last_event_type") if state_record else None
     last_event_at = state_record.get("last_event_at_epoch") if state_record else None
     if last_event:
@@ -1049,6 +1052,9 @@ def _sensor_alert_text(device: DeviceSpec, state: dict[str, object]) -> str:
     if state.get("beam") == "broken":
         return "Beam broken"
     if state.get("presence") is True:
+        count = state.get("target_count")
+        if isinstance(count, int) and count > 0:
+            return f"{count} {'person' if count == 1 else 'people'} in range"
         return "Presence detected"
     return ""
 
@@ -1072,8 +1078,58 @@ def _format_age(epoch: object) -> str:
     return f"{seconds / 86400:.1f}d ago"
 
 
+_FIELD_LABELS = {
+    "nearest_m": "Nearest (m)",
+    "target_count": "People tracked",
+    "duration_ms": "Last break (ms)",
+    "signal": "Receiver level",
+}
+
+
 def _humanize(key: str) -> str:
+    if key in _FIELD_LABELS:
+        return _FIELD_LABELS[key]
     return key.replace("_cm", " (cm)").replace("_ms", " (ms)").replace("_", " ").capitalize()
+
+
+def _radar_map_svg(targets: object) -> str:
+    """Top-down view of an RD-03D's coverage (120 degrees, 8 m) with its targets."""
+    width, height, range_mm = 260, 150, 8000.0
+    origin_x, origin_y = width / 2, height - 6
+    scale = (height - 14) / range_mm
+    half_fov = math.radians(60)
+    edge_x = math.sin(half_fov) * range_mm * scale
+    edge_y = math.cos(half_fov) * range_mm * scale
+    radius = range_mm * scale
+    parts = [
+        f"<svg viewBox='0 0 {width} {height}' width='100%' class='radar-map'>",
+        (
+            f"<path d='M{origin_x},{origin_y} L{origin_x - edge_x:.1f},{origin_y - edge_y:.1f} "
+            f"A{radius:.1f},{radius:.1f} 0 0,1 {origin_x + edge_x:.1f},{origin_y - edge_y:.1f} Z' "
+            "fill='#eef4ff' stroke='#bcd0f0'/>"
+        ),
+    ]
+    for ring_m in (2, 4, 6):
+        r = ring_m * 1000 * scale
+        parts.append(
+            f"<path d='M{origin_x - math.sin(half_fov) * r:.1f},{origin_y - math.cos(half_fov) * r:.1f} "
+            f"A{r:.1f},{r:.1f} 0 0,1 {origin_x + math.sin(half_fov) * r:.1f},"
+            f"{origin_y - math.cos(half_fov) * r:.1f}' fill='none' stroke='#d6e2f5' stroke-dasharray='3 3'/>"
+        )
+        parts.append(
+            f"<text x='{origin_x + 3}' y='{origin_y - r + 10:.1f}' font-size='8' fill='#7a8aa3'>{ring_m} m</text>"
+        )
+    parts.append(f"<circle cx='{origin_x}' cy='{origin_y}' r='3.5' fill='#214f98'/>")
+    for target in targets if isinstance(targets, list) else []:
+        if not isinstance(target, dict):
+            continue
+        x = origin_x + float(target.get("x_mm", 0)) * scale
+        y = origin_y - float(target.get("y_mm", 0)) * scale
+        moving = abs(float(target.get("speed_cms", 0))) > 15
+        color = "#d9480f" if moving else "#f08c00"
+        parts.append(f"<circle cx='{x:.1f}' cy='{y:.1f}' r='5' fill='{color}' fill-opacity='0.9'/>")
+    parts.append("</svg>")
+    return "".join(parts)
 
 
 def _format_state_value(value: object) -> str:
@@ -1279,6 +1335,10 @@ def _inject_styles() -> None:
             font-size: 0.86rem;
             color: #243244;
             padding: 0.12rem 0;
+        }
+        .radar-map {
+            display: block;
+            margin: 0.1rem 0 0.4rem 0;
         }
         .sensor-alert {
             background: #fff4e5;

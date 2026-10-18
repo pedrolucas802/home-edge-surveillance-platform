@@ -163,6 +163,16 @@ To run both cameras:
 python scripts/run_all_cameras.py --enable-yolo --tracking --launch-delay 3.0
 ```
 
+## Demo without hardware
+
+```bash
+bash scripts/run_demo.sh
+```
+
+Runs the hub with mock hardware (3 cameras, 4 RD-03D 24 GHz radars, 4
+tripwires) and opens the dashboard at http://localhost:8501. Mock data goes
+to `data/demo/`, so real data is untouched.
+
 ## Sensors and multiple devices
 
 A site can have any number of cameras, mmWave motion radars and tripwires,
