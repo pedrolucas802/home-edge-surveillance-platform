@@ -174,6 +174,24 @@ To run both cameras:
 python scripts/run_all_cameras.py --enable-yolo --tracking --launch-delay 3.0
 ```
 
+## Sensors and multiple devices
+
+A site can have any number of cameras, mmWave motion radars and tripwires,
+listed in a per-client `configs/devices.yaml` (start from
+`configs/devices.example.yaml`). Radars and tripwires are ESP32 boards that
+publish over MQTT; `app.sensors.bridge` stores their events next to the
+camera events, and `app.sensors.simulator` stands in for the boards until the
+hardware exists:
+
+```bash
+docker compose up -d mosquitto
+python -m app.sensors.bridge
+python -m app.sensors.simulator
+```
+
+See [docs/DEVICES.md](docs/DEVICES.md) for the MQTT contract and how to add a
+new device type.
+
 ## Local fine-tuning
 
 The full dataset-prep and fine-tuning workflow lives in [docs/TRAINING_RUNBOOK.md](docs/TRAINING_RUNBOOK.md).

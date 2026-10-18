@@ -5,6 +5,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import quote
 
+from app.devices.registry import DeviceRegistry, load_registry, resolve_devices_config_path
+
 _DOTENV_LOADED = False
 
 
@@ -155,6 +157,14 @@ class Settings:
     yolo_tracking: bool
     yolo_tracker: str
     yolo_track_history: int
+    site_id: str = "home"
+    devices_config: str = "configs/devices.yaml"
+    mqtt_host: str = "localhost"
+    mqtt_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_topic_prefix: str = "hes"
+    sensor_offline_after_seconds: float = 90.0
 
     def __post_init__(self) -> None:
         if not self.camera_id:
@@ -193,6 +203,10 @@ class Settings:
             raise ValueError("yolo_infer_every_n must be at least 1.")
         if self.yolo_track_history < 1:
             raise ValueError("yolo_track_history must be at least 1.")
+        if self.mqtt_port < 1:
+            raise ValueError("mqtt_port must be greater than 0.")
+        if self.sensor_offline_after_seconds <= 0:
+            raise ValueError("sensor_offline_after_seconds must be greater than 0.")
 
     @property
     def rtsp_url(self) -> str:
@@ -227,11 +241,30 @@ class Settings:
             f"Unknown camera id '{selected_id}'. Available cameras: {', '.join(sorted(hosts))}"
         )
 
+    def load_registry(self) -> DeviceRegistry:
+        return load_registry(
+            self.devices_config,
+            fallback_camera_hosts=self.camera_hosts_map,
+            fallback_site_id=self.site_id,
+        )
+
     @classmethod
     def from_env(cls) -> "Settings":
         _load_dotenv_if_present()
+        site_id = os.getenv("SITE_ID", "home")
+        devices_config = os.getenv("DEVICES_CONFIG", "configs/devices.yaml")
         camera_hosts = _get_mapping("CAMERA_HOSTS")
-        camera_id = os.getenv("CAMERA_ID", "cam1")
+        if resolve_devices_config_path(devices_config).exists():
+            # The per-client devices file is the source of truth for cameras
+            # once it exists; CAMERA_HOSTS stays as the camera-only fallback.
+            registry = load_registry(devices_config, fallback_site_id=site_id)
+            site_id = registry.site_id
+            if registry.camera_hosts():
+                camera_hosts = tuple(registry.camera_hosts().items())
+        default_camera_id = camera_hosts[0][0] if camera_hosts else "cam1"
+        camera_id = os.getenv("CAMERA_ID", default_camera_id)
+        if camera_hosts and camera_id not in dict(camera_hosts):
+            camera_id = default_camera_id
         fallback_host = os.getenv("CAM_HOST", "192.168.0.90")
         camera_host = dict(camera_hosts).get(camera_id, fallback_host)
         return cls(
@@ -277,6 +310,14 @@ class Settings:
             yolo_tracking=_get_bool("YOLO_TRACKING", False),
             yolo_tracker=os.getenv("YOLO_TRACKER", "bytetrack.yaml"),
             yolo_track_history=_get_int("YOLO_TRACK_HISTORY", 30),
+            site_id=site_id,
+            devices_config=devices_config,
+            mqtt_host=os.getenv("MQTT_HOST", "localhost"),
+            mqtt_port=_get_int("MQTT_PORT", 1883),
+            mqtt_username=os.getenv("MQTT_USERNAME", ""),
+            mqtt_password=os.getenv("MQTT_PASSWORD", ""),
+            mqtt_topic_prefix=os.getenv("MQTT_TOPIC_PREFIX", "hes"),
+            sensor_offline_after_seconds=_get_float("SENSOR_OFFLINE_AFTER_SECONDS", 90.0),
         )
 
     def with_overrides(self, **overrides: object) -> "Settings":

@@ -19,6 +19,8 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(project_root))
 
 from app.config.settings import Settings
+from app.devices.registry import DeviceRegistry, DeviceSpec
+from app.devices.types import CAMERA, get_device_type
 from app.storage.dashboard_store import resolve_dashboard_dir
 from app.storage.event_store import EventDatabase
 
@@ -31,7 +33,13 @@ PUBLISHERS_SUPERVISOR_LOG = PROJECT_ROOT / "data" / "logs" / "publishers-supervi
 def main() -> None:
     settings = Settings.from_env()
     dashboard_dir = resolve_dashboard_dir(settings.dashboard_dir)
-    camera_ids = list(settings.camera_hosts_map) or [settings.camera_id]
+    registry = settings.load_registry()
+    camera_ids = [device.id for device in registry.of_type(CAMERA)] or (
+        list(settings.camera_hosts_map) or [settings.camera_id]
+    )
+    sensor_devices = [
+        device for device in registry.enabled() if device.device_type.transport != "rtsp"
+    ]
 
     st.set_page_config(
         page_title="Home Edge Surveillance Dashboard",
@@ -67,6 +75,13 @@ def main() -> None:
         refresh_seconds = st.slider("Refresh interval (sec)", min_value=1, max_value=10, value=2)
         auto_refresh = st.toggle("Auto refresh", value=True)
         event_limit = st.slider("Recent events", min_value=5, max_value=50, value=12)
+        type_keys = registry.type_keys() or [CAMERA]
+        selected_types = st.multiselect(
+            "Event sources",
+            options=type_keys,
+            default=type_keys,
+            format_func=lambda key: get_device_type(key).plural,
+        )
         with st.expander("Zoom", expanded=True):
             zoom_levels = [1.0, 1.5, 2.0, 2.5, 3.0]
             zoom_by_camera = {
@@ -87,15 +102,26 @@ def main() -> None:
         camera_id: _load_status(dashboard_dir, camera_id)
         for camera_id in selected_cameras
     }
-    events = _load_recent_events(dashboard_dir, selected_cameras, limit=event_limit)
+    device_states = _load_device_states(dashboard_dir)
+    event_device_ids = [
+        camera_id for camera_id in selected_cameras if CAMERA in selected_types
+    ] + [device.id for device in sensor_devices if device.type in selected_types]
+    events = _load_recent_events(dashboard_dir, event_device_ids, limit=event_limit)
 
     _render_overview(statuses, events, settings)
-    live_tab, events_tab, health_tab = st.tabs(["Live Monitor", "Recent Events", "System Health"])
+    _render_device_type_summary(registry, statuses, device_states, settings)
+    live_tab, sensors_tab, devices_tab, events_tab, health_tab = st.tabs(
+        ["Live Monitor", "Sensors", "Devices", "Recent Events", "System Health"]
+    )
 
     with live_tab:
         _render_live_cameras(dashboard_dir, statuses, settings, zoom_by_camera)
+    with sensors_tab:
+        _render_sensors(sensor_devices, device_states, settings)
+    with devices_tab:
+        _render_devices(registry, statuses, device_states, settings)
     with events_tab:
-        _render_events(dashboard_dir, events)
+        _render_events(dashboard_dir, events, registry)
     with health_tab:
         _render_health(statuses, settings, dashboard_dir)
 
@@ -776,12 +802,23 @@ def _render_live_cameras(
             )
 
 
-def _render_events(dashboard_dir: Path, events: list[dict[str, object]]) -> None:
+def _render_events(
+    dashboard_dir: Path,
+    events: list[dict[str, object]],
+    registry: DeviceRegistry,
+) -> None:
     if not events:
-        st.info("No events have been recorded yet. Start a preview with YOLO enabled.")
+        st.info(
+            "No events have been recorded yet. Start a camera preview with YOLO enabled, "
+            "or run the sensor bridge (and the simulator until hardware exists)."
+        )
         return
 
     for event in events:
+        if str(event.get("device_type", CAMERA)) != CAMERA:
+            _render_sensor_event(event, registry)
+            st.divider()
+            continue
         snapshot_path = event.get("snapshot_path")
         snapshot_file = dashboard_dir / str(snapshot_path) if snapshot_path else None
         detections = event.get("detections", [])
@@ -807,6 +844,242 @@ def _render_events(dashboard_dir: Path, events: list[dict[str, object]]) -> None
                 )
                 st.caption(labels)
         st.divider()
+
+
+def _render_sensor_event(event: dict[str, object], registry: DeviceRegistry) -> None:
+    device_id = str(event.get("device_id", ""))
+    device = registry.get(device_id)
+    device_type = get_device_type(str(event.get("device_type", "")))
+    data = event.get("data") if isinstance(event.get("data"), dict) else {}
+    trigger = bool(data.get("trigger"))
+    details = ", ".join(
+        f"{key}: {value}"
+        for key, value in data.items()
+        if key not in {"trigger", "location", "zone", "rssi", "uptime_ms"} and value not in ("", None)
+    )
+    name = device.name if device else device_id
+    location = data.get("location") or (device.location if device else "")
+    marker = "🔴 " if trigger else ""
+    st.markdown(
+        f"{marker}{device_type.icon} **{name}** · {device_type.label}"
+        f"{f' · {location}' if location else ''}  \n"
+        f"{_format_timestamp(event.get('event_at_utc'))} · `{event.get('event_type', 'event')}`"
+    )
+    if details:
+        st.caption(details)
+
+
+def _render_device_type_summary(
+    registry: DeviceRegistry,
+    statuses: dict[str, dict[str, object] | None],
+    device_states: dict[str, dict[str, object]],
+    settings: Settings,
+) -> None:
+    grouped = registry.by_type()
+    if not grouped:
+        return
+    columns = st.columns(max(len(grouped), 1))
+    for column, (type_key, devices) in zip(columns, grouped.items()):
+        device_type = get_device_type(type_key)
+        online = sum(
+            1
+            for device in devices
+            if _device_presence(device, statuses, device_states, settings) == "online"
+        )
+        column.metric(f"{device_type.icon} {device_type.plural} online", f"{online}/{len(devices)}")
+
+
+def _render_sensors(
+    sensor_devices: list[DeviceSpec],
+    device_states: dict[str, dict[str, object]],
+    settings: Settings,
+) -> None:
+    if not sensor_devices:
+        st.info(
+            "No sensors are configured. Copy configs/devices.example.yaml to "
+            "configs/devices.yaml and list this site's radars and tripwires."
+        )
+        return
+
+    grouped: dict[str, list[DeviceSpec]] = {}
+    for device in sensor_devices:
+        grouped.setdefault(device.type, []).append(device)
+
+    for type_key, devices in grouped.items():
+        device_type = get_device_type(type_key)
+        st.subheader(f"{device_type.icon} {device_type.plural} ({len(devices)})")
+        columns = st.columns(3)
+        for idx, device in enumerate(devices):
+            with columns[idx % len(columns)]:
+                _render_sensor_card(device, device_states.get(device.id), settings)
+
+
+def _render_sensor_card(
+    device: DeviceSpec,
+    state_record: dict[str, object] | None,
+    settings: Settings,
+) -> None:
+    presence = _sensor_presence(state_record, settings)
+    badge_class = {"online": "badge-live", "offline": "badge-offline"}.get(presence, "badge-stale")
+    badge_text = {"online": "Online", "offline": "Offline"}.get(presence, "Never seen")
+    state = state_record.get("state", {}) if state_record else {}
+    telemetry = state_record.get("telemetry", {}) if state_record else {}
+    alert = _sensor_alert_text(device, state)
+    rows = [
+        f"<div class='sensor-row'><span>{_humanize(key)}</span><strong>{_format_state_value(state[key])}</strong></div>"
+        for key in device.device_type.state_fields
+        if key in state
+    ]
+    last_event = state_record.get("last_event_type") if state_record else None
+    last_event_at = state_record.get("last_event_at_epoch") if state_record else None
+    if last_event:
+        rows.append(
+            f"<div class='sensor-row'><span>Last event</span><strong>{last_event} "
+            f"({_format_age(last_event_at)})</strong></div>"
+        )
+    if telemetry.get("rssi") is not None:
+        rows.append(
+            f"<div class='sensor-row'><span>Wi-Fi</span><strong>{telemetry['rssi']} dBm</strong></div>"
+        )
+    alert_html = f"<div class='sensor-alert'>{alert}</div>" if alert else ""
+    st.markdown(
+        (
+            f"<div class='camera-card{' sensor-card-offline' if presence == 'offline' else ''}'>"
+            f"<div class='camera-card-header'>"
+            f"<div><div class='camera-title'>{device.name}</div>"
+            f"<div class='camera-subtitle'>{device.id}"
+            f"{f' · {device.location}' if device.location else ''}</div></div>"
+            f"<span class='status-badge {badge_class}'>{badge_text}</span>"
+            f"</div>{alert_html}{''.join(rows) or '<div class=camera-subtitle>No state yet.</div>'}</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def _render_devices(
+    registry: DeviceRegistry,
+    statuses: dict[str, dict[str, object] | None],
+    device_states: dict[str, dict[str, object]],
+    settings: Settings,
+) -> None:
+    rows: list[dict[str, object]] = []
+    for device in registry.devices:
+        state_record = device_states.get(device.id) or {}
+        telemetry = state_record.get("telemetry", {}) if state_record else {}
+        rows.append(
+            {
+                "type": device.device_type.label,
+                "id": device.id,
+                "name": device.name,
+                "location": device.location,
+                "zone": device.zone,
+                "status": (
+                    _device_presence(device, statuses, device_states, settings)
+                    if device.enabled
+                    else "disabled"
+                ),
+                "last_seen": _format_age(_device_last_seen(device, statuses, state_record)),
+                "last_event": state_record.get("last_event_type"),
+                "rssi": telemetry.get("rssi"),
+                "firmware": telemetry.get("fw") or telemetry.get("firmware"),
+            }
+        )
+    st.caption(f"Site: {registry.site_id} | Devices file: {registry.source or 'n/a'}")
+    st.dataframe(rows, width="stretch", hide_index=True)
+
+    unregistered = [
+        record for record in device_states.values() if not record.get("registered", True)
+    ]
+    if unregistered:
+        st.warning(
+            "These devices are talking to the hub but are not in the devices file, "
+            "so their events are not kept: "
+            + ", ".join(str(record["device_id"]) for record in unregistered)
+        )
+
+
+def _device_presence(
+    device: DeviceSpec,
+    statuses: dict[str, dict[str, object] | None],
+    device_states: dict[str, dict[str, object]],
+    settings: Settings,
+) -> str:
+    if device.type == CAMERA:
+        status = statuses.get(device.id)
+        if status is None:
+            return "never seen"
+        age = _status_age_seconds(status)
+        if age is not None and age <= settings.dashboard_publish_interval_seconds * 3:
+            return "online"
+        return "offline"
+    return _sensor_presence(device_states.get(device.id), settings)
+
+
+def _sensor_presence(state_record: dict[str, object] | None, settings: Settings) -> str:
+    if not state_record:
+        return "never seen"
+    last_seen = state_record.get("last_seen_at_epoch")
+    if not isinstance(last_seen, (int, float)) or last_seen <= 0:
+        return "never seen"
+    if state_record.get("status") == "offline":
+        return "offline"
+    if time.time() - float(last_seen) > settings.sensor_offline_after_seconds:
+        return "offline"
+    return "online"
+
+
+def _device_last_seen(
+    device: DeviceSpec,
+    statuses: dict[str, dict[str, object] | None],
+    state_record: dict[str, object],
+) -> float | None:
+    if device.type == CAMERA:
+        status = statuses.get(device.id)
+        age = _status_age_seconds(status) if status else None
+        return time.time() - age if age is not None else None
+    last_seen = state_record.get("last_seen_at_epoch")
+    return float(last_seen) if isinstance(last_seen, (int, float)) and last_seen > 0 else None
+
+
+def _sensor_alert_text(device: DeviceSpec, state: dict[str, object]) -> str:
+    if state.get("fault") is True or state.get("beam") == "fault":
+        return "Fault reported"
+    if state.get("tamper") is True:
+        return "Enclosure opened"
+    if state.get("beam") == "broken":
+        return "Beam broken"
+    if state.get("presence") is True:
+        return "Presence detected"
+    return ""
+
+
+def _load_device_states(dashboard_dir: Path) -> dict[str, dict[str, object]]:
+    if not (dashboard_dir / "events.db").exists():
+        return {}
+    return _get_event_database(str(dashboard_dir)).device_states()
+
+
+def _format_age(epoch: object) -> str:
+    if not isinstance(epoch, (int, float)) or epoch <= 0:
+        return "never"
+    seconds = max(time.time() - float(epoch), 0.0)
+    if seconds < 60:
+        return f"{seconds:.0f}s ago"
+    if seconds < 3600:
+        return f"{seconds / 60:.0f}m ago"
+    if seconds < 86400:
+        return f"{seconds / 3600:.1f}h ago"
+    return f"{seconds / 86400:.1f}d ago"
+
+
+def _humanize(key: str) -> str:
+    return key.replace("_cm", " (cm)").replace("_ms", " (ms)").replace("_", " ").capitalize()
+
+
+def _format_state_value(value: object) -> str:
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return str(value)
 
 
 def _render_health(
@@ -883,7 +1156,7 @@ def _load_recent_events(
     if not camera_ids:
         return []
     event_db = _get_event_database(str(dashboard_dir))
-    return event_db.query_events(camera_ids=camera_ids, limit=limit)
+    return event_db.query_events(device_ids=camera_ids, limit=limit)
 
 
 def _load_display_image(path: Path, zoom_factor: float) -> Image.Image | None:
@@ -992,6 +1265,29 @@ def _inject_styles() -> None:
         .badge-stale {
             background: #fff1e8;
             color: #b45309;
+        }
+        .badge-offline {
+            background: #ffe8e8;
+            color: #b91c1c;
+        }
+        .sensor-card-offline {
+            border-color: rgba(185, 28, 28, 0.45);
+        }
+        .sensor-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.86rem;
+            color: #243244;
+            padding: 0.12rem 0;
+        }
+        .sensor-alert {
+            background: #fff4e5;
+            color: #9a3412;
+            border-radius: 10px;
+            padding: 0.3rem 0.6rem;
+            margin-bottom: 0.4rem;
+            font-weight: 700;
+            font-size: 0.86rem;
         }
         .counts-row {
             margin-top: 0.5rem;

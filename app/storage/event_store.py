@@ -23,7 +23,28 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_camera_time ON events (camera_id, event_at_epoch DESC);
 CREATE INDEX IF NOT EXISTS idx_events_time ON events (event_at_epoch DESC);
+CREATE TABLE IF NOT EXISTS device_state (
+    device_id TEXT PRIMARY KEY,
+    device_type TEXT NOT NULL,
+    status TEXT,
+    state_json TEXT NOT NULL DEFAULT '{}',
+    telemetry_json TEXT NOT NULL DEFAULT '{}',
+    last_event_type TEXT,
+    last_event_at_epoch REAL,
+    last_seen_at_epoch REAL,
+    registered INTEGER NOT NULL DEFAULT 1
+);
 """
+
+# Columns added when the store grew from camera-only to any device type.
+# camera_id stays as the legacy name for the device id so existing databases
+# and readers keep working; device_id is the column new code should read.
+_DEVICE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("device_id", "TEXT"),
+    ("device_type", "TEXT NOT NULL DEFAULT 'camera'"),
+    ("event_type", "TEXT NOT NULL DEFAULT 'detection'"),
+    ("data_json", "TEXT NOT NULL DEFAULT '{}'"),
+)
 
 
 class EventDatabase:
@@ -44,7 +65,32 @@ class EventDatabase:
         self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.execute("PRAGMA busy_timeout=5000;")
         self._conn.executescript(_SCHEMA)
+        self._migrate_device_columns()
         self._conn.commit()
+
+    def _migrate_device_columns(self) -> None:
+        existing = {row["name"] for row in self._conn.execute("PRAGMA table_info(events)")}
+        added = False
+        for name, definition in _DEVICE_COLUMNS:
+            if name in existing:
+                continue
+            try:
+                self._conn.execute(f"ALTER TABLE events ADD COLUMN {name} {definition}")
+                added = True
+            except sqlite3.OperationalError as exc:
+                # Another process may have migrated between our check and ALTER.
+                if "duplicate column" not in str(exc).lower():
+                    raise
+        if added:
+            self._conn.execute("UPDATE events SET device_id = camera_id WHERE device_id IS NULL")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_device_time "
+            "ON events (device_id, event_at_epoch DESC)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_type_time "
+            "ON events (device_type, event_at_epoch DESC)"
+        )
 
     def close(self) -> None:
         self._conn.close()
@@ -56,18 +102,20 @@ class EventDatabase:
         except ValueError:
             event_at_epoch = time.time()
 
+        device_id = str(record.get("device_id") or record.get("camera_id") or "")
         try:
             with self._conn:
                 self._conn.execute(
                     """
                     INSERT OR IGNORE INTO events (
                         event_id, camera_id, camera_host, event_at_utc, event_at_epoch,
-                        frame_index, detections_count, counts_json, detections_json, snapshot_path
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        frame_index, detections_count, counts_json, detections_json, snapshot_path,
+                        device_id, device_type, event_type, data_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(record.get("event_id")),
-                        str(record.get("camera_id", "")),
+                        device_id,
                         record.get("camera_host"),
                         event_at_utc,
                         event_at_epoch,
@@ -76,6 +124,10 @@ class EventDatabase:
                         json.dumps(record.get("counts", {}), ensure_ascii=True),
                         json.dumps(record.get("detections", []), ensure_ascii=True),
                         record.get("snapshot_path"),
+                        device_id,
+                        str(record.get("device_type") or "camera"),
+                        str(record.get("event_type") or "detection"),
+                        json.dumps(record.get("data", {}), ensure_ascii=True),
                     ),
                 )
         except sqlite3.OperationalError as exc:
@@ -84,10 +136,78 @@ class EventDatabase:
             # fatal for the publisher loop.
             self.logger.warning("Failed to persist event to SQLite: %s", exc)
 
+    def upsert_device_state(
+        self,
+        device_id: str,
+        device_type: str,
+        *,
+        status: str | None = None,
+        state_patch: dict[str, object] | None = None,
+        telemetry: dict[str, object] | None = None,
+        last_event_type: str | None = None,
+        last_event_at_epoch: float | None = None,
+        seen_at_epoch: float | None = None,
+        registered: bool = True,
+    ) -> None:
+        """Merge new information about a device into its last known state."""
+        seen_at = seen_at_epoch if seen_at_epoch is not None else time.time()
+        try:
+            with self._conn:
+                row = self._conn.execute(
+                    "SELECT * FROM device_state WHERE device_id = ?", (device_id,)
+                ).fetchone()
+                state = json.loads(row["state_json"]) if row else {}
+                state.update(state_patch or {})
+                stored_telemetry = json.loads(row["telemetry_json"]) if row else {}
+                stored_telemetry.update(telemetry or {})
+                self._conn.execute(
+                    """
+                    INSERT INTO device_state (
+                        device_id, device_type, status, state_json, telemetry_json,
+                        last_event_type, last_event_at_epoch, last_seen_at_epoch, registered
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        device_type = excluded.device_type,
+                        status = COALESCE(excluded.status, device_state.status),
+                        state_json = excluded.state_json,
+                        telemetry_json = excluded.telemetry_json,
+                        last_event_type = COALESCE(
+                            excluded.last_event_type, device_state.last_event_type
+                        ),
+                        last_event_at_epoch = COALESCE(
+                            excluded.last_event_at_epoch, device_state.last_event_at_epoch
+                        ),
+                        last_seen_at_epoch = MAX(
+                            COALESCE(device_state.last_seen_at_epoch, 0),
+                            excluded.last_seen_at_epoch
+                        ),
+                        registered = excluded.registered
+                    """,
+                    (
+                        device_id,
+                        device_type,
+                        status,
+                        json.dumps(state, ensure_ascii=True),
+                        json.dumps(stored_telemetry, ensure_ascii=True),
+                        last_event_type,
+                        last_event_at_epoch,
+                        seen_at,
+                        1 if registered else 0,
+                    ),
+                )
+        except sqlite3.OperationalError as exc:
+            self.logger.warning("Failed to persist state for %s: %s", device_id, exc)
+
+    def device_states(self) -> dict[str, dict[str, object]]:
+        rows = self._conn.execute("SELECT * FROM device_state").fetchall()
+        return {row["device_id"]: _state_row_to_record(row) for row in rows}
+
     def query_events(
         self,
         camera_ids: list[str] | None = None,
         class_name: str | None = None,
+        device_ids: list[str] | None = None,
+        device_types: list[str] | None = None,
         start_epoch: float | None = None,
         end_epoch: float | None = None,
         limit: int = 50,
@@ -98,6 +218,18 @@ class EventDatabase:
             placeholders = ",".join("?" for _ in camera_ids)
             clauses.append(f"camera_id IN ({placeholders})")
             params.extend(camera_ids)
+        if device_ids is not None:
+            if not device_ids:
+                return []
+            placeholders = ",".join("?" for _ in device_ids)
+            clauses.append(f"device_id IN ({placeholders})")
+            params.extend(device_ids)
+        if device_types is not None:
+            if not device_types:
+                return []
+            placeholders = ",".join("?" for _ in device_types)
+            clauses.append(f"device_type IN ({placeholders})")
+            params.extend(device_types)
         if start_epoch is not None:
             clauses.append("event_at_epoch >= ?")
             params.append(start_epoch)
@@ -130,9 +262,58 @@ class EventDatabase:
         return int(row["n"]) if row else 0
 
 
+def run_retention(
+    event_db: EventDatabase,
+    base_dir: Path,
+    retention_days: float,
+    logger: logging.Logger,
+) -> int:
+    """Delete events older than retention_days and their snapshot files."""
+    if retention_days <= 0:
+        return 0
+    cutoff_epoch = time.time() - (retention_days * 86400.0)
+    stale_snapshot_paths = event_db.purge_older_than(cutoff_epoch)
+    if not stale_snapshot_paths:
+        return 0
+
+    removed = 0
+    for relative_path in stale_snapshot_paths:
+        snapshot_path = base_dir / relative_path
+        try:
+            snapshot_path.unlink(missing_ok=True)
+            removed += 1
+        except OSError as exc:
+            logger.warning("Failed to remove stale snapshot %s: %s", snapshot_path, exc)
+    logger.info(
+        "Event retention purge removed %s snapshot event(s) older than %s day(s), %s file(s) deleted.",
+        len(stale_snapshot_paths),
+        retention_days,
+        removed,
+    )
+    return len(stale_snapshot_paths)
+
+
+def _state_row_to_record(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "device_id": row["device_id"],
+        "device_type": row["device_type"],
+        "status": row["status"],
+        "state": json.loads(row["state_json"]) if row["state_json"] else {},
+        "telemetry": json.loads(row["telemetry_json"]) if row["telemetry_json"] else {},
+        "last_event_type": row["last_event_type"],
+        "last_event_at_epoch": row["last_event_at_epoch"],
+        "last_seen_at_epoch": row["last_seen_at_epoch"],
+        "registered": bool(row["registered"]),
+    }
+
+
 def _row_to_record(row: sqlite3.Row) -> dict[str, object]:
     return {
         "event_id": row["event_id"],
+        "device_id": row["device_id"] or row["camera_id"],
+        "device_type": row["device_type"] or "camera",
+        "event_type": row["event_type"] or "detection",
+        "data": json.loads(row["data_json"]) if row["data_json"] else {},
         "camera_id": row["camera_id"],
         "camera_host": row["camera_host"],
         "event_at_utc": row["event_at_utc"],

@@ -13,7 +13,7 @@ import numpy as np
 from app.config.settings import Settings
 from app.detection.async_runner import DetectorStats
 from app.detection.yolo_detector import Detection
-from app.storage.event_store import EventDatabase
+from app.storage.event_store import EventDatabase, run_retention
 from app.stream.reader import FramePacket
 
 
@@ -142,25 +142,7 @@ class DashboardStore:
             return
         self._last_retention_check_at = now_monotonic
 
-        cutoff_epoch = time.time() - (retention_days * 86400.0)
-        stale_snapshot_paths = self.event_db.purge_older_than(cutoff_epoch)
-        if not stale_snapshot_paths:
-            return
-
-        removed = 0
-        for relative_path in stale_snapshot_paths:
-            snapshot_path = self.base_dir / relative_path
-            try:
-                snapshot_path.unlink(missing_ok=True)
-                removed += 1
-            except OSError as exc:
-                self.logger.warning("Failed to remove stale snapshot %s: %s", snapshot_path, exc)
-        self.logger.info(
-            "Event retention purge removed %s event(s) older than %s day(s), %s snapshot(s) deleted.",
-            len(stale_snapshot_paths),
-            retention_days,
-            removed,
-        )
+        run_retention(self.event_db, self.base_dir, retention_days, self.logger)
 
     def _build_event_record(
         self,
@@ -172,6 +154,9 @@ class DashboardStore:
         event_timestamp = _utc_now_iso()
         return {
             "event_id": f"{self.settings.camera_id}-{packet.index}-{int(time.time() * 1000)}",
+            "device_id": self.settings.camera_id,
+            "device_type": "camera",
+            "event_type": "detection",
             "camera_id": self.settings.camera_id,
             "camera_host": self.settings.camera_host,
             "event_at_utc": event_timestamp,
