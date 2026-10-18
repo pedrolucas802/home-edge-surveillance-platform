@@ -1,4 +1,48 @@
 services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: surveillance-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./data/mosquitto:/mosquitto/data
+    restart: unless-stopped
+
+  sensor-bridge:
+    image: surveillance-platform-local:latest
+    build: .
+    container_name: surveillance-sensor-bridge
+    command: ["python", "-m", "app.sensors.bridge"]
+    env_file:
+      - .env
+    environment:
+      DASHBOARD_DIR: /app/data/dashboard
+      MQTT_HOST: mosquitto
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs:ro
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  # Virtual radar and tripwire boards. Start with: docker compose --profile sim up
+  sensor-simulator:
+    image: surveillance-platform-local:latest
+    build: .
+    container_name: surveillance-sensor-simulator
+    command: ["python", "-m", "app.sensors.simulator"]
+    profiles: ["sim"]
+    env_file:
+      - .env
+    environment:
+      MQTT_HOST: mosquitto
+    volumes:
+      - ./configs:/app/configs:ro
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
   camera-publishers:
     image: surveillance-platform-local:latest
     build: .
@@ -14,6 +58,7 @@ services:
       CAMERA_PUBLISHERS_ENABLED: ${CAMERA_PUBLISHERS_ENABLED:-true}
     volumes:
       - ./data:/app/data
+      - ./configs:/app/configs:ro
     restart: unless-stopped
 
   dashboard:
@@ -37,6 +82,7 @@ services:
       CAMERA_PUBLISHERS_ENABLED: ${CAMERA_PUBLISHERS_ENABLED:-true}
     volumes:
       - ./data:/app/data
+      - ./configs:/app/configs:ro
     ports:
       - "8501:8501"
     depends_on:

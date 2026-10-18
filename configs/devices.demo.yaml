@@ -1,0 +1,77 @@
+# Demo site used by scripts/run_demo.sh: mock cameras, RD-03D radars and
+# tripwires, grouped by zone so one person walking through a zone shows up
+# on that zone's tripwire, radar and camera together.
+site: demo
+
+devices:
+  # Cameras (mocked: synthetic frames with person detections).
+  - id: cam-front
+    type: camera
+    name: Front yard
+    location: front-yard
+    zone: front
+    host: 192.168.0.90
+  - id: cam-driveway
+    type: camera
+    name: Driveway
+    location: driveway
+    zone: driveway
+    host: 192.168.0.89
+  - id: cam-back
+    type: camera
+    name: Backyard
+    location: backyard
+    zone: back
+    host: 192.168.0.91
+
+  # Ai-Thinker RD-03D 24 GHz radars: up to 3 people, x/y and speed, 8 m range.
+  - id: radar-porch
+    type: radar
+    name: Porch radar
+    location: front-porch
+    zone: front
+    model: RD-03D
+  - id: radar-garage
+    type: radar
+    name: Garage radar
+    location: garage
+    zone: driveway
+    model: RD-03D
+  - id: radar-living-room
+    type: radar
+    name: Living room radar
+    location: living-room
+    zone: indoor
+    model: RD-03D
+  - id: radar-hallway
+    type: radar
+    name: Hallway radar
+    location: hallway
+    zone: indoor
+    model: RD-03D
+
+  # Tripwires: active IR barriers outdoors, laser + receiver indoors.
+  - id: tripwire-front-wall
+    type: tripwire
+    name: Front wall beam
+    location: front-wall
+    zone: front
+    variant: ir-barrier
+  - id: tripwire-gate
+    type: tripwire
+    name: Driveway gate beam
+    location: gate
+    zone: driveway
+    variant: ir-barrier
+  - id: tripwire-back-wall
+    type: tripwire
+    name: Back wall beam
+    location: back-wall
+    zone: back
+    variant: ir-barrier
+  - id: tripwire-hallway
+    type: tripwire
+    name: Hallway laser
+    location: hallway
+    zone: indoor
+    variant: laser

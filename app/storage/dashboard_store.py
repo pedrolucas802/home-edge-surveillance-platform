@@ -13,6 +13,7 @@ import numpy as np
 from app.config.settings import Settings
 from app.detection.async_runner import DetectorStats
 from app.detection.yolo_detector import Detection
+from app.storage.event_store import EventDatabase, run_retention
 from app.stream.reader import FramePacket
 
 
@@ -27,7 +28,7 @@ def resolve_dashboard_dir(raw_path: str) -> Path:
 class DashboardStore:
     """Persist live camera artifacts for the Streamlit dashboard."""
 
-    _TRACK_EVENT_DEDUP_CLASSES: frozenset[str] = frozenset({"person", "cat", "car"})
+    _TRACK_EVENT_DEDUP_CLASSES: frozenset[str] = frozenset({"person"})
 
     def __init__(self, settings: Settings, logger: logging.Logger) -> None:
         self.settings = settings
@@ -40,10 +41,12 @@ class DashboardStore:
         self.events_dir.mkdir(parents=True, exist_ok=True)
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
         (self.snapshots_dir / settings.camera_id).mkdir(parents=True, exist_ok=True)
+        self.event_db = EventDatabase(self.base_dir / "events.db", logger=self.logger)
         self._last_publish_at = 0.0
         self._last_event_at = 0.0
         self._last_event_signature: tuple[tuple[str, int | None], ...] | None = None
         self._seen_tracked_event_ids: set[tuple[str, int]] = set()
+        self._last_retention_check_at = 0.0
 
     def publish(
         self,
@@ -68,9 +71,12 @@ class DashboardStore:
                 self.events_dir / f"{self.settings.camera_id}.jsonl",
                 event_record,
             )
+            self.event_db.insert_event(event_record)
             self._last_event_at = now_monotonic
             self._last_event_signature = self._build_event_signature(detections)
             should_publish_live = True
+
+        self._maybe_run_retention(now_monotonic)
 
         if not should_publish_live:
             return
@@ -127,6 +133,17 @@ class DashboardStore:
             "tracking_enabled": self.settings.yolo_tracking,
         }
 
+    def _maybe_run_retention(self, now_monotonic: float) -> None:
+        retention_days = self.settings.event_retention_days
+        if retention_days <= 0:
+            return
+        check_interval = self.settings.event_retention_check_interval_seconds
+        if now_monotonic - self._last_retention_check_at < check_interval:
+            return
+        self._last_retention_check_at = now_monotonic
+
+        run_retention(self.event_db, self.base_dir, retention_days, self.logger)
+
     def _build_event_record(
         self,
         packet: FramePacket,
@@ -137,6 +154,9 @@ class DashboardStore:
         event_timestamp = _utc_now_iso()
         return {
             "event_id": f"{self.settings.camera_id}-{packet.index}-{int(time.time() * 1000)}",
+            "device_id": self.settings.camera_id,
+            "device_type": "camera",
+            "event_type": "detection",
             "camera_id": self.settings.camera_id,
             "camera_host": self.settings.camera_host,
             "event_at_utc": event_timestamp,

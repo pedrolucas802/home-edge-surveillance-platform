@@ -1,0 +1,62 @@
+# Per-client device registry. Copy to configs/devices.yaml (git-ignored) and
+# list every device installed at this site. Any number of each type is fine.
+#
+# Every device needs a unique lowercase `id` and a `type`. Known types are
+# camera, radar and tripwire; any other type still loads and shows on the
+# dashboard as a generic MQTT device, so a new sensor can be added here
+# before the hub has dedicated support for it.
+#
+# Optional on every device: name, location, zone, enabled (default true).
+# Any other key is a type-specific option (e.g. host for a camera).
+# MQTT devices publish to hes/<site>/<id>/{event,state,status,telemetry}.
+
+site: home
+
+devices:
+  # Cameras (RTSP). host replaces CAMERA_HOSTS from .env once this file exists.
+  - id: cam1
+    type: camera
+    name: Front yard
+    location: front-yard
+    zone: front
+    host: 192.168.0.90
+  - id: cam2
+    type: camera
+    name: Driveway
+    location: driveway
+    zone: driveway
+    host: 192.168.0.89
+
+  # mmWave motion radars (ESP32 + Ai-Thinker RD-03D, 24 GHz, tracks up to 3 people).
+  - id: radar-living-room
+    type: radar
+    name: Living room radar
+    location: living-room
+    zone: indoor
+    model: RD-03D
+  - id: radar-garage
+    type: radar
+    name: Garage radar
+    location: garage
+    zone: driveway
+    model: RD-03D
+
+  # Tripwires (laser indoors, active IR barrier outdoors).
+  - id: tripwire-front-wall
+    type: tripwire
+    name: Front wall beam
+    location: front-wall
+    zone: front
+    variant: ir-barrier
+  - id: tripwire-back-gate
+    type: tripwire
+    name: Back gate beam
+    location: back-gate
+    zone: back
+    variant: ir-barrier
+  - id: tripwire-hallway
+    type: tripwire
+    name: Hallway laser
+    location: hallway
+    zone: indoor
+    variant: laser
