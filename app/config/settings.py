@@ -141,6 +141,8 @@ class Settings:
     dashboard_dir: str
     dashboard_publish_interval_seconds: float
     dashboard_event_cooldown_seconds: float
+    event_retention_days: float
+    event_retention_check_interval_seconds: float
     yolo_enabled: bool
     yolo_pose_enabled: bool
     yolo_model: str
@@ -181,6 +183,8 @@ class Settings:
             raise ValueError("dashboard_publish_interval_seconds must be greater than 0.")
         if self.dashboard_event_cooldown_seconds <= 0:
             raise ValueError("dashboard_event_cooldown_seconds must be greater than 0.")
+        if self.event_retention_check_interval_seconds <= 0:
+            raise ValueError("event_retention_check_interval_seconds must be greater than 0.")
         if self.rtsp_transport not in {"udp", "tcp"}:
             raise ValueError("rtsp_transport must be either 'udp' or 'tcp'.")
         if self.yolo_imgsz < 32:
@@ -257,6 +261,10 @@ class Settings:
             dashboard_dir=os.getenv("DASHBOARD_DIR", "data/dashboard"),
             dashboard_publish_interval_seconds=_get_float("DASHBOARD_PUBLISH_INTERVAL_SECONDS", 1.0),
             dashboard_event_cooldown_seconds=_get_float("DASHBOARD_EVENT_COOLDOWN_SECONDS", 3.0),
+            event_retention_days=_get_float("EVENT_RETENTION_DAYS", 30.0),
+            event_retention_check_interval_seconds=_get_float(
+                "EVENT_RETENTION_CHECK_INTERVAL_SECONDS", 3600.0
+            ),
             yolo_enabled=_get_bool("YOLO_ENABLED", False),
             yolo_pose_enabled=_get_bool("YOLO_POSE_ENABLED", False),
             yolo_model=os.getenv("YOLO_MODEL", "models/home-surveillance-yolo26m-best.pt"),

@@ -20,6 +20,7 @@ if __package__ in (None, ""):
 
 from app.config.settings import Settings
 from app.storage.dashboard_store import resolve_dashboard_dir
+from app.storage.event_store import EventDatabase
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_DIR = PROJECT_ROOT / "data" / "runtime"
@@ -869,27 +870,20 @@ def _load_status(dashboard_dir: Path, camera_id: str) -> dict[str, object] | Non
         return None
 
 
+@st.cache_resource(show_spinner=False)
+def _get_event_database(dashboard_dir: str) -> EventDatabase:
+    return EventDatabase(Path(dashboard_dir) / "events.db")
+
+
 def _load_recent_events(
     dashboard_dir: Path,
     camera_ids: list[str],
     limit: int,
 ) -> list[dict[str, object]]:
-    events: list[dict[str, object]] = []
-    for camera_id in camera_ids:
-        path = dashboard_dir / "events" / f"{camera_id}.jsonl"
-        if not path.exists():
-            continue
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()[-limit:]
-        except OSError:
-            continue
-        for line in lines:
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    events.sort(key=lambda item: str(item.get("event_at_utc", "")), reverse=True)
-    return events[:limit]
+    if not camera_ids:
+        return []
+    event_db = _get_event_database(str(dashboard_dir))
+    return event_db.query_events(camera_ids=camera_ids, limit=limit)
 
 
 def _load_display_image(path: Path, zoom_factor: float) -> Image.Image | None:

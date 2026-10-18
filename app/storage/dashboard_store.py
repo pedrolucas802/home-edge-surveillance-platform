@@ -13,6 +13,7 @@ import numpy as np
 from app.config.settings import Settings
 from app.detection.async_runner import DetectorStats
 from app.detection.yolo_detector import Detection
+from app.storage.event_store import EventDatabase
 from app.stream.reader import FramePacket
 
 
@@ -40,10 +41,12 @@ class DashboardStore:
         self.events_dir.mkdir(parents=True, exist_ok=True)
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
         (self.snapshots_dir / settings.camera_id).mkdir(parents=True, exist_ok=True)
+        self.event_db = EventDatabase(self.base_dir / "events.db", logger=self.logger)
         self._last_publish_at = 0.0
         self._last_event_at = 0.0
         self._last_event_signature: tuple[tuple[str, int | None], ...] | None = None
         self._seen_tracked_event_ids: set[tuple[str, int]] = set()
+        self._last_retention_check_at = 0.0
 
     def publish(
         self,
@@ -68,9 +71,12 @@ class DashboardStore:
                 self.events_dir / f"{self.settings.camera_id}.jsonl",
                 event_record,
             )
+            self.event_db.insert_event(event_record)
             self._last_event_at = now_monotonic
             self._last_event_signature = self._build_event_signature(detections)
             should_publish_live = True
+
+        self._maybe_run_retention(now_monotonic)
 
         if not should_publish_live:
             return
@@ -126,6 +132,35 @@ class DashboardStore:
             "yolo_confidence": self.settings.yolo_confidence,
             "tracking_enabled": self.settings.yolo_tracking,
         }
+
+    def _maybe_run_retention(self, now_monotonic: float) -> None:
+        retention_days = self.settings.event_retention_days
+        if retention_days <= 0:
+            return
+        check_interval = self.settings.event_retention_check_interval_seconds
+        if now_monotonic - self._last_retention_check_at < check_interval:
+            return
+        self._last_retention_check_at = now_monotonic
+
+        cutoff_epoch = time.time() - (retention_days * 86400.0)
+        stale_snapshot_paths = self.event_db.purge_older_than(cutoff_epoch)
+        if not stale_snapshot_paths:
+            return
+
+        removed = 0
+        for relative_path in stale_snapshot_paths:
+            snapshot_path = self.base_dir / relative_path
+            try:
+                snapshot_path.unlink(missing_ok=True)
+                removed += 1
+            except OSError as exc:
+                self.logger.warning("Failed to remove stale snapshot %s: %s", snapshot_path, exc)
+        self.logger.info(
+            "Event retention purge removed %s event(s) older than %s day(s), %s snapshot(s) deleted.",
+            len(stale_snapshot_paths),
+            retention_days,
+            removed,
+        )
 
     def _build_event_record(
         self,
