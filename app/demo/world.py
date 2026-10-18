@@ -329,4 +329,13 @@ class SiteWorld:
             "fw": "sim-0.2",
             "heap_free": self.rng.randint(150_000, 200_000),
             "model": str(device.option("model") or device.option("variant") or ""),
+            **self._network_identity(device),
+        }
+
+    def _network_identity(self, device: DeviceSpec) -> dict[str, str]:
+        # Stable fake DHCP lease and MAC per board, so the device list has IPs.
+        index = self.registry.devices.index(device)
+        return {
+            "ip": str(device.option("host") or f"192.168.0.{120 + index}"),
+            "mac": f"24:6f:28:00:{index // 256:02x}:{index % 256:02x}",
         }

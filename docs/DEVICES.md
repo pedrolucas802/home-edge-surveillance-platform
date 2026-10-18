@@ -60,10 +60,12 @@ python -m app.sensors.simulator       # virtual boards for every radar and tripw
 bash scripts/run_dashboard_stack.sh --dashboard-only
 ```
 
-The dashboard's **Sensors** tab shows a card per radar and tripwire, grouped
-by type; **Devices** lists every device with online/offline, last seen, RSSI
-and firmware; **Recent Events** mixes camera and sensor events (🔴 marks a
-trigger event such as a broken beam).
+The dashboard has a page per device kind: **Cameras**, **Radars** (live
+top-down maps of each RD-03D's targets) and **Tripwires** (beam state and
+every crossing). **All devices** lists every device with online/offline,
+IP, MAC, RSSI, firmware and last seen. **Configuration** is where devices,
+camera IPs, the detection model, alerts, Wi-Fi, alignment and the owner's
+profile are edited; the sidebar is navigation only.
 
 No broker at all? `python -m app.sensors.simulator --direct` writes straight
 into the event store, skipping MQTT and the bridge.
@@ -81,8 +83,8 @@ the devices file and `<device-id>` is the device's `id`.
 | `event` | device to hub | no | `{"event": "beam_broken", "ts": 1792300000.5, ...}` |
 | `state` | device to hub | yes | `{"presence": true, "distance_cm": 210}` (merged into last state) |
 | `status` | device to hub | yes | `online` / `offline`; set `offline` as the MQTT Last Will |
-| `telemetry` | device to hub | no | `{"rssi": -60, "uptime_ms": 123456, "fw": "1.0.0"}` every 30 to 60 s |
-| `cmd` | hub to device | no | reserved for siren and arm/disarm commands |
+| `telemetry` | device to hub | no | `{"rssi": -60, "uptime_ms": 123456, "fw": "1.0.0", "ip": "192.168.0.120", "mac": "24:6f:28:…"}` every 30 to 60 s |
+| `cmd` | hub to device | no | `{"cmd": "wifi", "ssid": …, "password": …}` or `{"cmd": "align", "seconds": 60}`; later siren and arm/disarm |
 
 Radars (RD-03D) also publish `state` about twice a second while someone is
 in range, with the decoded targets (the module tracks up to 3 people, 8 m,
@@ -109,9 +111,24 @@ listed in the type's `state_fields` also update the device card.
 A sensor is shown offline when its status is `offline` or nothing has
 arrived from it for `SENSOR_OFFLINE_AFTER_SECONDS` (default 90 s). Messages
 from ids that are not in the devices file are not stored as events; the
-Devices tab lists them so you can add them.
+All devices page lists them, and Configuration → Devices adds them with one click.
 
-## 4. Adding a new device type
+## 4. Configuration page
+
+Device edits (names, zones, IPs, enable/disable, radar mounting height and
+range limit, tripwire alarm threshold) are written back to the devices file.
+Everything else (owner profile, alert switches and quiet hours, the Wi-Fi the
+boards should join, the default detection model, refresh rate) goes to
+`<DASHBOARD_DIR>/hub_config.yaml` (override with `HUB_CONFIG`). It holds the
+Wi-Fi password, so it is written with owner-only permissions and lives in the
+git-ignored data folder. The demo works on `data/demo/devices.yaml`, a copy
+of `configs/devices.demo.yaml` made on first run. Running sensor services
+pick up device edits when restarted.
+
+"Send Wi-Fi to boards" and "Start alignment mode" publish on the `cmd`
+channel, so they need the MQTT broker running.
+
+## 5. Adding a new device type
 
 Register it in `app/devices/types.py`:
 

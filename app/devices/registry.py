@@ -159,3 +159,36 @@ def _parse_device(entry: object, index: int, source: str) -> DeviceSpec:
         enabled=bool(entry.get("enabled", True)),
         options=options,
     )
+
+
+def device_to_dict(device: DeviceSpec) -> dict[str, object]:
+    """Return a device as it is written in the devices file."""
+    entry: dict[str, object] = {"id": device.id, "type": device.type, "name": device.name}
+    if device.location:
+        entry["location"] = device.location
+    if device.zone:
+        entry["zone"] = device.zone
+    if not device.enabled:
+        entry["enabled"] = False
+    entry.update(device.options)
+    return entry
+
+
+def save_registry(path: Path | str, site_id: str, devices: list[dict[str, object]]) -> DeviceRegistry:
+    """Validate and write the site's devices file; return the saved registry.
+
+    Raises ValueError (and leaves the file alone) when the devices do not
+    form a valid registry, e.g. a duplicate or malformed id.
+    """
+    config_path = resolve_devices_config_path(str(path))
+    registry = parse_registry({"site": site_id, "devices": devices}, source=str(config_path))
+    body = {"site": registry.site_id, "devices": [device_to_dict(d) for d in registry.devices]}
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = config_path.with_suffix(config_path.suffix + ".tmp")
+    tmp_path.write_text(
+        "# Written by the dashboard's Configuration page.\n"
+        + yaml.safe_dump(body, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    tmp_path.replace(config_path)
+    return registry

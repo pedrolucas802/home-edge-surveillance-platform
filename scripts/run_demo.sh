@@ -10,9 +10,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
-export DEVICES_CONFIG="${DEVICES_CONFIG:-configs/devices.demo.yaml}"
 export DASHBOARD_DIR="${DASHBOARD_DIR:-data/demo}"
+# The Configuration page edits the devices file, so the demo works on a copy
+# inside its data folder and the template in configs/ stays untouched.
+if [[ -z "${DEVICES_CONFIG:-}" ]]; then
+  mkdir -p "${DASHBOARD_DIR}"
+  [[ -f "${DASHBOARD_DIR}/devices.yaml" ]] || cp configs/devices.demo.yaml "${DASHBOARD_DIR}/devices.yaml"
+  export DEVICES_CONFIG="${DASHBOARD_DIR}/devices.yaml"
+fi
 export CAMERA_PUBLISHERS_ENABLED=false
+export HES_DEMO=1
 
 TRANSPORT="direct"
 if [[ "${1:-}" == "--mqtt" ]]; then

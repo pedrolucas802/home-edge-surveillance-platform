@@ -14,7 +14,7 @@ from app.storage.event_store import EventDatabase
 CHANNELS = frozenset({"event", "state", "status", "telemetry"})
 # Payload keys that describe the device rather than the event itself.
 TELEMETRY_KEYS = frozenset(
-    {"rssi", "uptime_ms", "fw", "firmware", "heap_free", "battery_v", "voltage"}
+    {"rssi", "uptime_ms", "fw", "firmware", "heap_free", "battery_v", "voltage", "ip", "mac"}
 )
 _ENVELOPE_KEYS = frozenset({"device", "event", "ts", "type"})
 # Device clocks come from NTP and can be wrong right after boot, so a
